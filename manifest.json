@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D0D0D" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Body Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:       '#0D0D0D',
+            surface:  '#1A1A1A',
+            border:   '#2A2A2A',
+            accent:   '#C8F135',
+            'accent-dim': '#8AAD20',
+            text:     '#F0F0F0',
+            muted:    '#6B6B6B',
+            danger:   '#FF4D4D',
+            success:  '#C8F135',
+            neutral:  '#6B6B6B',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; background: #0D0D0D; }
+    body { font-family: 'Inter', sans-serif; color: #F0F0F0; }
+
+    /* Safe area for notched phones */
+    #app { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+    /* Screens */
+    .screen { display: none; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* Nav */
+    #nav-bar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+    /* Input numérico — protagonista */
+    #weight-input {
+      font-size: clamp(4rem, 20vw, 7rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #F0F0F0;
+      text-align: center;
+      width: 100%;
+      caret-color: #C8F135;
+      -moz-appearance: textfield;
+    }
+    #weight-input::-webkit-outer-spin-button,
+    #weight-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    #weight-input::placeholder { color: #2A2A2A; }
+
+    /* Chart container */
+    #weight-chart-container {
+      position: relative;
+      width: 100%;
+    }
+
+    /* Confirmation animation */
+    @keyframes confirm-pop {
+      0%   { transform: scale(0.5); opacity: 0; }
+      60%  { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .confirm-pop { animation: confirm-pop 0.35s ease-out forwards; }
+
+    @keyframes fade-out {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .fade-out { animation: fade-out 0.3s ease-in forwards; }
+
+    /* Scroll */
+    .scroll-y { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Nav badge */
+    .nav-badge {
+      position: absolute;
+      top: 4px; right: calc(50% - 18px);
+      width: 7px; height: 7px;
+      background: #C8F135;
+      border-radius: 50%;
+    }
+
+    /* Tailwind doesn't ship every arbitrary value via CDN — helpers */
+    .text-accent { color: #C8F135; }
+    .bg-surface { background: #1A1A1A; }
+    .border-border { border-color: #2A2A2A; }
+    .text-muted { color: #6B6B6B; }
+    .text-danger { color: #FF4D4D; }
+
+    /* Scrollbar invisible */
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+
+<div id="app" class="flex flex-col h-full" style="background:#0D0D0D;">
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: PESO DIARIO
+  ════════════════════════════════════════ -->
+  <section id="screen-peso" class="screen active flex-1 min-h-0">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <div>
+        <p id="peso-date-label" class="text-muted text-xs font-medium uppercase tracking-widest"></p>
+        <h1 class="text-text text-xl font-700 leading-tight">Peso diario</h1>
+      </div>
+      <button id="btn-settings" aria-label="Ajustes"
+        class="w-10 h-10 flex items-center justify-center rounded-full"
+        style="background:#1A1A1A;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Área de input / valor guardado -->
+    <div id="peso-input-area" class="flex flex-col items-center justify-center px-6 pt-2 pb-4" style="flex-shrink:0;">
+
+      <!-- Estado: sin registro hoy -->
+      <div id="peso-no-registro" class="w-full flex flex-col items-center">
+        <p class="text-muted text-sm mb-3">Peso de hoy en kg</p>
+        <input
+          id="weight-input"
+          type="number"
+          inputmode="decimal"
+          step="0.1"
+          min="30"
+          max="300"
+          placeholder="0.0"
+          autocomplete="off"
+        />
+        <!-- Confirmación (oculta por defecto) -->
+        <div id="peso-confirm-icon" class="hidden flex-col items-center mt-2">
+          <svg width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="19" fill="#C8F135" opacity="0.15"/>
+            <polyline points="12,20 18,26 28,14" fill="none" stroke="#C8F135" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <button id="btn-guardar-peso"
+          class="mt-4 w-full py-4 rounded-2xl font-600 text-base transition-all active:scale-95"
+          style="background:#C8F135; color:#0D0D0D; font-weight:700; min-height:52px;">
+          Guardar
+        </button>
+      </div>
+
+      <!-- Estado: ya hay registro hoy -->
+      <div id="peso-con-registro" class="hidden w-full flex-col items-center">
+        <p class="text-muted text-sm mb-1">Hoy registraste</p>
+        <div class="flex items-baseline gap-1 mb-1">
+          <span id="peso-valor-hoy" class="text-text font-800"
+            style="font-size: clamp(4rem,20vw,7rem); letter-spacing:-0.03em; line-height:1;">—</span>
+          <span class="text-muted font-500 text-2xl">kg</span>
+        </div>
+        <p class="text-muted text-xs mb-4">
+          Media 7 días: <span id="peso-media-movil" class="text-accent font-600">—</span> kg
+        </p>
+        <button id="btn-editar-peso"
+          class="px-6 py-2 rounded-xl text-sm font-500 border transition-all active:scale-95"
+          style="border-color:#2A2A2A; color:#6B6B6B; background:transparent;">
+          Editar
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Gráfico -->
+    <div class="flex-1 min-h-0 flex flex-col px-4 pb-2 scroll-y">
+
+      <!-- Botones de rango -->
+      <div class="flex gap-2 mb-3" style="flex-shrink:0;">
+        <button data-range="4w" class="range-btn flex-1 py-2 rounded-xl text-xs font-600 transition-all"
+          style="background:#1A1A1A; color:#C8F135; border: 1px solid #C8F135;">4 semanas</button>
+        <button data-range="3m" class="range-btn flex-1 py-2 rounded-xl text-xs font-600 transition-all"
+          style="background:#1A1A1A; color:#6B6B6B; border: 1px solid #2A2A2A;">3 meses</button>
+        <button data-range="all" class="range-btn flex-1 py-2 rounded-xl text-xs font-600 transition-all"
+          style="background:#1A1A1A; color:#6B6B6B; border: 1px solid #2A2A2A;">Todo</button>
+      </div>
+
+      <!-- Canvas Chart.js -->
+      <div id="weight-chart-container" class="flex-1 min-h-0" style="min-height:180px; position:relative;">
+        <canvas id="weight-chart"></canvas>
+        <!-- Empty state -->
+        <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center">
+          <p class="text-muted text-sm text-center">Registrá tu peso durante algunos días<br>para ver la tendencia aquí.</p>
+        </div>
+      </div>
+
+      <!-- Botón reset zoom (oculto por defecto) -->
+      <button id="btn-reset-zoom" class="hidden mt-2 text-xs text-muted py-1 underline" style="background:transparent; border:none;">
+        Resetear zoom
+      </button>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: MEDICIONES (placeholder Fase 2)
+  ════════════════════════════════════════ -->
+  <section id="screen-mediciones" class="screen flex-1 min-h-0 items-center justify-center">
+    <div class="text-center px-8">
+      <div class="text-4xl mb-4">📏</div>
+      <p class="text-text font-600 text-lg mb-2">Mediciones corporales</p>
+      <p class="text-muted text-sm">Disponible en Fase 2</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: CHECK-IN (placeholder Fase 3)
+  ════════════════════════════════════════ -->
+  <section id="screen-checkin" class="screen flex-1 min-h-0 items-center justify-center">
+    <div class="text-center px-8">
+      <div class="text-4xl mb-4">🏆</div>
+      <p class="text-text font-600 text-lg mb-2">Check-in mensual</p>
+      <p class="text-muted text-sm">Disponible en Fase 3</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: FOTOS (placeholder Fase 4)
+  ════════════════════════════════════════ -->
+  <section id="screen-fotos" class="screen flex-1 min-h-0 items-center justify-center">
+    <div class="text-center px-8">
+      <div class="text-4xl mb-4">📷</div>
+      <p class="text-text font-600 text-lg mb-2">Fotos de progreso</p>
+      <p class="text-muted text-sm">Disponible en Fase 4</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: DASHBOARD (placeholder Fase 5)
+  ════════════════════════════════════════ -->
+  <section id="screen-dashboard" class="screen flex-1 min-h-0 items-center justify-center">
+    <div class="text-center px-8">
+      <div class="text-4xl mb-4">📊</div>
+      <p class="text-text font-600 text-lg mb-2">Dashboard</p>
+      <p class="text-muted text-sm">Disponible en Fase 5</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       BARRA DE NAVEGACIÓN INFERIOR
+  ════════════════════════════════════════ -->
+  <nav id="nav-bar" class="flex items-center justify-around border-t"
+    style="background:#0D0D0D; border-color:#2A2A2A; flex-shrink:0; min-height:56px;">
+
+    <button data-tab="peso" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M8 12h8M12 8v8"/>
+      </svg>
+      <span class="text-[10px] font-500">Peso</span>
+    </button>
+
+    <button data-tab="mediciones" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18M3 12h18M3 18h18"/>
+        <circle cx="6" cy="6" r="1" fill="currentColor"/>
+        <circle cx="12" cy="12" r="1" fill="currentColor"/>
+        <circle cx="18" cy="18" r="1" fill="currentColor"/>
+      </svg>
+      <span class="text-[10px] font-500">Medidas</span>
+    </button>
+
+    <button data-tab="checkin" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span class="text-[10px] font-500">Check-in</span>
+    </button>
+
+    <button data-tab="fotos" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <span class="text-[10px] font-500">Fotos</span>
+    </button>
+
+    <button data-tab="dashboard" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <span class="text-[10px] font-500">Dashboard</span>
+    </button>
+
+  </nav>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCRIPTS — orden de carga importante
+════════════════════════════════════════ -->
+
+<!-- Dexie.js -->
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+<!-- Hammer.js + chartjs-plugin-zoom -->
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<!-- App modules -->
+<script src="db.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
