@@ -7,7 +7,7 @@ const db = new Dexie('BodyTrackerDB');
 
 // Versión 1: los cuatro stores definidos desde el inicio
 // para no tener que hacer migraciones en fases siguientes.
-db.version(1).stores({
+db.version(2).stores({
   Registro_Peso:          'fecha, peso, mediaMovil',
   Mediciones_Corporales:  'fecha, cintura, brazoRelajado, brazoCont, muslo',
   Checkin_Mensual:        'fecha, banca, dominadas, rdl, fatiga, notas',
