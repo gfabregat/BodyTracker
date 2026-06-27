@@ -818,6 +818,7 @@ const inputCiRdl          = document.getElementById('ci-rdl');
 const inputCiFatiga       = document.getElementById('ci-fatiga');
 const inputCiFatigaActiva = document.getElementById('ci-fatiga-activa');
 const ciFatigaValor       = document.getElementById('ci-fatiga-valor');
+const inputCiPasos        = document.getElementById('ci-pasos');
 const inputCiNotas        = document.getElementById('ci-notas');
 const dashboardBadge      = document.getElementById('dashboard-badge');
 
@@ -906,6 +907,11 @@ function renderResumenCheckin(reg, todos) {
       <p class="text-muted text-xs mb-1">Notas</p>
       <p class="text-sm" style="color:#F0F0F0; line-height:1.5; white-space:pre-wrap;">${escapeHTML(reg.notas)}</p>
     </div>` : ''}
+    ${reg.pasos !== null && reg.pasos !== undefined ? `
+    <div class="rounded-xl p-3 mt-2" style="background:#0D0D0D;">
+      <p class="text-muted text-xs mb-1">Media de pasos diarios</p>
+      <p class="text-text font-700">${reg.pasos.toLocaleString('es-ES')} <span class="text-muted font-400 text-xs">pasos/día</span></p>
+    </div>` : ''}
   `;
 }
 
@@ -983,6 +989,13 @@ function renderHistorialCheckin(historial, todos) {
           <p class="text-muted text-xs mb-1">Notas</p>
           <p class="text-sm" style="color:#F0F0F0; line-height:1.5; white-space:pre-wrap;">${escapeHTML(reg.notas)}</p>
         </div>` : ''}
+        ${reg.pasos !== null && reg.pasos !== undefined ? `
+        <div class="px-4 pb-3">
+          <div class="rounded-xl px-3 py-2" style="background:#0D0D0D;">
+            <span class="text-muted text-xs">Pasos/día: </span>
+            <span class="text-text font-700 text-sm">${reg.pasos.toLocaleString('es-ES')}</span>
+          </div>
+        </div>` : ''}
       </div>`;
   }).join('');
 
@@ -1015,6 +1028,7 @@ function abrirFormCheckinNuevo() {
   ciFatigaValor.textContent = '5';
   inputCiFatigaActiva.checked = true;
   inputCiFatiga.disabled = false;
+  inputCiPasos.value     = '';
   inputCiNotas.value     = '';
   ciFormContainer.classList.remove('hidden');
   ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1043,6 +1057,7 @@ async function abrirFormCheckinEdicion(mes) {
   }
 
   inputCiNotas.value = reg.notas || '';
+  inputCiPasos.value = reg.pasos !== null && reg.pasos !== undefined ? reg.pasos : '';
   ciFormContainer.classList.remove('hidden');
   ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1073,10 +1088,12 @@ btnCiGuardar.addEventListener('click', async () => {
   const dominadas = parsearPR(inputCiDominadas);
   const rdl       = parsearPR(inputCiRdl);
   const fatiga    = inputCiFatigaActiva.checked ? parseInt(inputCiFatiga.value, 10) : null;
+  const pasosVal  = inputCiPasos.value.trim();
+  const pasos     = pasosVal !== '' ? Math.round(parseFloat(pasosVal)) : null;
   const notas     = inputCiNotas.value.trim() || null;
 
   // Al menos un campo debe tener dato
-  if (banca === null && dominadas === null && rdl === null && fatiga === null && !notas) {
+  if (banca === null && dominadas === null && rdl === null && fatiga === null && pasos === null && !notas) {
     const hint = document.createElement('div');
     hint.textContent = 'Completá al menos un campo antes de guardar';
     hint.style.cssText = `
@@ -1090,7 +1107,7 @@ btnCiGuardar.addEventListener('click', async () => {
   }
 
   const mes = ciEditandoMes || mesActual();
-  await guardarCheckin(mes, { banca, dominadas, rdl, fatiga, notas });
+  await guardarCheckin(mes, { banca, dominadas, rdl, fatiga, pasos, notas });
 
   cerrarFormCheckin();
   await renderCheckinUI();
@@ -1695,7 +1712,20 @@ async function renderDashboard(mes) {
         <span class="text-muted font-500">/10</span>
         <span class="text-sm ml-auto">${renderDeltaFlecha(dFatiga, '')}</span>
       </div>
-      ${renderBarraFatiga(ciActual.fatiga)}`;
+      ${renderBarraFatiga(ciActual.fatiga)}
+      ${ciActual.pasos !== null && ciActual.pasos !== undefined ? `
+      <div class="mt-3 pt-3" style="border-top:1px solid #2A2A2A;">
+        <span class="text-muted text-xs">Pasos/día: </span>
+        <span class="text-text font-700">${ciActual.pasos.toLocaleString('es-ES')}</span>
+        ${ciAnterior?.pasos !== null && ciAnterior?.pasos !== undefined ? `
+        <span class="text-muted text-xs ml-2">(anterior: ${ciAnterior.pasos.toLocaleString('es-ES')})</span>` : ''}
+      </div>` : ''}`;
+  } else if (ciActual?.pasos !== null && ciActual?.pasos !== undefined) {
+    dashFatiga.innerHTML = `
+      <span class="text-muted text-xs">Pasos/día: </span>
+      <span class="text-text font-700">${ciActual.pasos.toLocaleString('es-ES')}</span>
+      ${ciAnterior?.pasos !== null && ciAnterior?.pasos !== undefined ? `
+      <span class="text-muted text-xs ml-2">(anterior: ${ciAnterior.pasos.toLocaleString('es-ES')})</span>` : ''}`;
   } else {
     dashFatiga.innerHTML = `<p class="text-muted text-sm">Sin fatiga registrada para este mes.</p>`;
   }

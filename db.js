@@ -263,6 +263,7 @@ async function guardarCheckin(mes, datos) {
     dominadas: datos.dominadas ?? null,
     rdl:       datos.rdl       ?? null,
     fatiga:    datos.fatiga    ?? null,
+    pasos:     datos.pasos     ?? null,
     notas:     datos.notas     ?? null,
   });
 }

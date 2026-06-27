@@ -425,6 +425,16 @@
             <label for="ci-fatiga-activa" class="text-muted text-xs cursor-pointer">Incluir fatiga en este check-in</label>
           </div>
 
+          <!-- Pasos diarios -->
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Media de pasos diarios</p>
+          <div class="mb-5">
+            <input id="ci-pasos" type="number" inputmode="numeric" step="100" min="0" max="100000"
+              placeholder="ej: 8500"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+            <p class="text-muted text-xs mt-2">Promedio de pasos por día durante el mes</p>
+          </div>
+
           <!-- Notas -->
           <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Notas de contexto <span style="font-weight:400;">(opcional)</span></p>
           <textarea id="ci-notas" rows="3"
