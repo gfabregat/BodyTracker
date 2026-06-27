@@ -12,6 +12,7 @@ db.version(1).stores({
   Mediciones_Corporales:  'fecha, cintura, brazoRelajado, brazoCont, muslo',
   Checkin_Mensual:        'fecha, banca, dominadas, rdl, fatiga, notas',
   Fotos_Progreso:         'fecha, frente, espalda, perfilD, perfilI',
+  Macros_Diarias:         'fecha, proteina, carbos, grasas',
 });
 
 // ─────────────────────────────────────────────────────────
@@ -479,11 +480,12 @@ function guardarAjustes(ajustes) {
  * @param {boolean} incluirFotos
  */
 async function exportarDatos(incluirFotos = false) {
-  const [pesos, mediciones, checkins, fotos] = await Promise.all([
+  const [pesos, mediciones, checkins, fotos, macros] = await Promise.all([
     obtenerTodosLosPesos(),
     obtenerTodasLasMediciones(),
     obtenerTodosLosCheckins(),
     incluirFotos ? obtenerTodasLasFotos() : Promise.resolve([]),
+    obtenerTodasLasMacros(),
   ]);
 
   return {
@@ -494,6 +496,7 @@ async function exportarDatos(incluirFotos = false) {
     Mediciones_Corporales: mediciones,
     Checkin_Mensual: checkins,
     Fotos_Progreso: incluirFotos ? fotos : [],
+    Macros_Diarias: macros,
     _fotosIncluidas: incluirFotos,
   };
 }
@@ -514,13 +517,15 @@ async function importarDatos(datos) {
     db.Mediciones_Corporales.clear(),
     db.Checkin_Mensual.clear(),
     db.Fotos_Progreso.clear(),
+    db.Macros_Diarias.clear(),
   ]);
 
   // Importar cada store
-  if (datos.Registro_Peso?.length)       await db.Registro_Peso.bulkPut(datos.Registro_Peso);
-  if (datos.Mediciones_Corporales?.length) await db.Mediciones_Corporales.bulkPut(datos.Mediciones_Corporales);
-  if (datos.Checkin_Mensual?.length)     await db.Checkin_Mensual.bulkPut(datos.Checkin_Mensual);
-  if (datos.Fotos_Progreso?.length)      await db.Fotos_Progreso.bulkPut(datos.Fotos_Progreso);
+  if (datos.Registro_Peso?.length)         await db.Registro_Peso.bulkPut(datos.Registro_Peso);
+  if (datos.Mediciones_Corporales?.length)  await db.Mediciones_Corporales.bulkPut(datos.Mediciones_Corporales);
+  if (datos.Checkin_Mensual?.length)        await db.Checkin_Mensual.bulkPut(datos.Checkin_Mensual);
+  if (datos.Fotos_Progreso?.length)         await db.Fotos_Progreso.bulkPut(datos.Fotos_Progreso);
+  if (datos.Macros_Diarias?.length)         await db.Macros_Diarias.bulkPut(datos.Macros_Diarias);
 
   // Restaurar ajustes si vienen en el backup
   if (datos.ajustes) guardarAjustes(datos.ajustes);
@@ -587,4 +592,88 @@ function colorFlechaPeso(diff, objetivo) {
   if (objetivo === 'definicion')  return diff < 0 ? 'mejor' : 'peor';
   // mantenimiento: cualquier cambio > umbral es neutro-adverso
   return 'neutral';
+}
+
+// ─────────────────────────────────────────────────────────
+//  MACROS DIARIAS
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Guarda (o actualiza) el registro de macros de una fecha.
+ * @param {string} fecha    - YYYY-MM-DD
+ * @param {object} datos    - { proteina, carbos, grasas } — todos opcionales (null)
+ */
+async function guardarMacros(fecha, datos) {
+  await db.Macros_Diarias.put({
+    fecha,
+    proteina: datos.proteina ?? null,
+    carbos:   datos.carbos   ?? null,
+    grasas:   datos.grasas   ?? null,
+  });
+}
+
+/**
+ * Obtiene el registro de macros de una fecha.
+ * @param {string} fecha - YYYY-MM-DD
+ */
+async function obtenerMacrosPorFecha(fecha) {
+  return db.Macros_Diarias.get(fecha);
+}
+
+/**
+ * Obtiene todos los registros de macros de un mes dado.
+ * @param {string} mes - YYYY-MM
+ * @returns {Array} ordenado por fecha ascendente
+ */
+async function obtenerMacrosPorMes(mes) {
+  return db.Macros_Diarias
+    .where('fecha')
+    .between(`${mes}-01`, `${mes}-31`, true, true)
+    .sortBy('fecha');
+}
+
+/**
+ * Obtiene todos los registros de macros ordenados por fecha ascendente.
+ */
+async function obtenerTodasLasMacros() {
+  return db.Macros_Diarias.orderBy('fecha').toArray();
+}
+
+/**
+ * Elimina el registro de macros de una fecha.
+ */
+async function eliminarMacros(fecha) {
+  await db.Macros_Diarias.delete(fecha);
+}
+
+/**
+ * Calcula el promedio de macros de un mes.
+ * Solo promedia los días que tienen dato para cada macro.
+ * @param {string} mes - YYYY-MM
+ * @returns {{ proteina, carbos, grasas, diasTotal, diasConDato }}
+ */
+async function calcularPromedioMacrosMes(mes) {
+  const registros = await obtenerMacrosPorMes(mes);
+
+  // Días totales del mes
+  const [y, m] = mes.split('-').map(Number);
+  const diasTotales = new Date(y, m, 0).getDate();
+
+  if (!registros.length) return { proteina: null, carbos: null, grasas: null, diasConDato: 0, diasTotales };
+
+  const sumaP = registros.reduce((a, r) => a + (r.proteina ?? 0), 0);
+  const sumaC = registros.reduce((a, r) => a + (r.carbos   ?? 0), 0);
+  const sumaG = registros.reduce((a, r) => a + (r.grasas   ?? 0), 0);
+
+  const diasP = registros.filter(r => r.proteina !== null).length;
+  const diasC = registros.filter(r => r.carbos   !== null).length;
+  const diasG = registros.filter(r => r.grasas   !== null).length;
+
+  return {
+    proteina:   diasP > 0 ? Math.round(sumaP / diasP) : null,
+    carbos:     diasC > 0 ? Math.round(sumaC / diasC) : null,
+    grasas:     diasG > 0 ? Math.round(sumaG / diasG) : null,
+    diasConDato: registros.length,
+    diasTotales,
+  };
 }

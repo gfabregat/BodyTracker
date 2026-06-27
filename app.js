@@ -9,6 +9,7 @@
 
 const screens = {
   peso:       document.getElementById('screen-peso'),
+  macros:     document.getElementById('screen-macros'),
   mediciones: document.getElementById('screen-mediciones'),
   checkin:    document.getElementById('screen-checkin'),
   fotos:      document.getElementById('screen-fotos'),
@@ -36,6 +37,11 @@ function navegarA(tab) {
   // Si vamos a peso, refrescar el estado
   if (tab === 'peso') {
     initPesoScreen();
+  }
+
+  // Si vamos a macros, refrescar
+  if (tab === 'macros') {
+    initMacrosScreen();
   }
 
   // Si vamos a mediciones, refrescar
@@ -434,6 +440,181 @@ btnResetZoom.addEventListener('click', () => {
     weightChart.resetZoom();
     btnResetZoom.classList.add('hidden');
   }
+});
+
+// ─────────────────────────────────────────────────────────
+//  PANTALLA DE MACROS
+// ─────────────────────────────────────────────────────────
+
+const macrosMesLabel       = document.getElementById('macros-mes-label');
+const macrosPromedio       = document.getElementById('macros-promedio');
+const macrosFormContainer  = document.getElementById('macros-form-container');
+const macrosFormTitulo     = document.getElementById('macros-form-titulo');
+const macrosHistorial      = document.getElementById('macros-historial');
+const macrosHistorialEmpty = document.getElementById('macros-historial-empty');
+const btnNuevaMacro        = document.getElementById('btn-nueva-macro');
+const btnMacrosGuardar     = document.getElementById('btn-macros-guardar');
+const btnMacrosCancelar    = document.getElementById('btn-macros-cancelar');
+const inputMacrosFecha     = document.getElementById('macros-fecha');
+const inputMacrosProteina  = document.getElementById('macros-proteina');
+const inputMacrosCarbos    = document.getElementById('macros-carbos');
+const inputMacrosGrasas    = document.getElementById('macros-grasas');
+
+let macrosEditandoFecha = null; // null = nueva, 'YYYY-MM-DD' = editando
+
+async function initMacrosScreen() {
+  macrosMesLabel.textContent = formatearMes(mesActual());
+  await renderMacrosUI();
+}
+
+async function renderMacrosUI() {
+  const registros = await obtenerMacrosPorMes(mesActual());
+  const promedio  = await calcularPromedioMacrosMes(mesActual());
+
+  renderMacrosPromedio(promedio);
+  renderMacrosHistorial(registros);
+}
+
+// ── Promedio del mes ────────────────────────────────────
+
+function renderMacrosPromedio(p) {
+  if (p.diasConDato === 0) {
+    macrosPromedio.innerHTML = `<p class="text-muted text-sm">Sin registros este mes.</p>`;
+    return;
+  }
+
+  const dias = `<span class="text-muted text-xs">(${p.diasConDato} de ${p.diasTotales} días registrados)</span>`;
+
+  macrosPromedio.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-text text-xs font-600 uppercase tracking-wider">Promedio diario</p>
+      ${dias}
+    </div>
+    <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="rounded-xl p-3" style="background:#0D0D0D;">
+        <p class="text-muted text-xs mb-1">Proteína</p>
+        <p class="text-text font-700 text-lg">${p.proteina ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+      </div>
+      <div class="rounded-xl p-3" style="background:#0D0D0D;">
+        <p class="text-muted text-xs mb-1">Carbos</p>
+        <p class="text-text font-700 text-lg">${p.carbos ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+      </div>
+      <div class="rounded-xl p-3" style="background:#0D0D0D;">
+        <p class="text-muted text-xs mb-1">Grasas</p>
+        <p class="text-text font-700 text-lg">${p.grasas ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+      </div>
+    </div>`;
+}
+
+// ── Historial del mes ───────────────────────────────────
+
+function renderMacrosHistorial(registros) {
+  if (!registros.length) {
+    macrosHistorialEmpty.classList.remove('hidden');
+    macrosHistorial.innerHTML = '';
+    return;
+  }
+  macrosHistorialEmpty.classList.add('hidden');
+
+  // Más reciente primero
+  macrosHistorial.innerHTML = [...registros].reverse().map(reg => {
+    const fechaLabel = formatearFecha(reg.fecha);
+    return `
+      <div class="flex items-center justify-between px-4 py-3 rounded-2xl"
+        style="background:#1A1A1A; border:1px solid #2A2A2A;">
+        <div>
+          <p class="text-text text-sm font-600 mb-1">${fechaLabel}</p>
+          <p class="text-muted text-xs">
+            ${reg.proteina !== null ? `P: <span style="color:#F0F0F0;">${reg.proteina}g</span>` : ''}
+            ${reg.carbos   !== null ? `  C: <span style="color:#F0F0F0;">${reg.carbos}g</span>` : ''}
+            ${reg.grasas   !== null ? `  G: <span style="color:#F0F0F0;">${reg.grasas}g</span>` : ''}
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button class="macro-editar-btn text-xs px-3 py-1 rounded-lg"
+            data-fecha="${reg.fecha}"
+            style="background:#2A2A2A; color:#6B6B6B;">Editar</button>
+          <button class="macro-eliminar-btn text-xs px-3 py-1 rounded-lg"
+            data-fecha="${reg.fecha}"
+            style="background:#2A2A2A; color:#FF4D4D;">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.macro-editar-btn').forEach(btn => {
+    btn.addEventListener('click', () => abrirFormMacroEdicion(btn.dataset.fecha));
+  });
+
+  document.querySelectorAll('.macro-eliminar-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await eliminarMacros(btn.dataset.fecha);
+      await renderMacrosUI();
+      mostrarToast('Registro eliminado', '#6B6B6B');
+    });
+  });
+}
+
+// ── Formulario ──────────────────────────────────────────
+
+function abrirFormMacroNueva() {
+  macrosEditandoFecha = null;
+  macrosFormTitulo.textContent = 'Registrar macros';
+  inputMacrosFecha.value    = hoy();
+  inputMacrosProteina.value = '';
+  inputMacrosCarbos.value   = '';
+  inputMacrosGrasas.value   = '';
+  macrosFormContainer.classList.remove('hidden');
+  macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => inputMacrosProteina.focus(), 300);
+}
+
+async function abrirFormMacroEdicion(fecha) {
+  const reg = await obtenerMacrosPorFecha(fecha);
+  if (!reg) return;
+  macrosEditandoFecha = fecha;
+  macrosFormTitulo.textContent = 'Editar — ' + formatearFecha(fecha);
+  inputMacrosFecha.value    = fecha;
+  inputMacrosFecha.disabled = true; // No cambiar la fecha al editar
+  inputMacrosProteina.value = reg.proteina ?? '';
+  inputMacrosCarbos.value   = reg.carbos   ?? '';
+  inputMacrosGrasas.value   = reg.grasas   ?? '';
+  macrosFormContainer.classList.remove('hidden');
+  macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cerrarFormMacros() {
+  macrosFormContainer.classList.add('hidden');
+  inputMacrosFecha.disabled = false;
+  macrosEditandoFecha = null;
+}
+
+function parsearMacro(input) {
+  const v = parseFloat(input.value);
+  return input.value.trim() === '' || isNaN(v) ? null : Math.round(v);
+}
+
+btnNuevaMacro.addEventListener('click', abrirFormMacroNueva);
+btnMacrosCancelar.addEventListener('click', cerrarFormMacros);
+
+btnMacrosGuardar.addEventListener('click', async () => {
+  const fecha    = inputMacrosFecha.value;
+  const proteina = parsearMacro(inputMacrosProteina);
+  const carbos   = parsearMacro(inputMacrosCarbos);
+  const grasas   = parsearMacro(inputMacrosGrasas);
+
+  if (!fecha) {
+    mostrarToast('Seleccioná una fecha', '#FF4D4D');
+    return;
+  }
+  if (proteina === null && carbos === null && grasas === null) {
+    mostrarToast('Completá al menos un campo', '#FF4D4D');
+    return;
+  }
+
+  await guardarMacros(fecha, { proteina, carbos, grasas });
+  cerrarFormMacros();
+  await renderMacrosUI();
+  mostrarToast('✓ Macros guardadas', '#C8F135');
 });
 
 // ─────────────────────────────────────────────────────────
@@ -1869,6 +2050,7 @@ async function generarInformeMarkdown(mes) {
     medActual, medAnterior,
     ciActual, ciAnterior,
     fotosActual,
+    promedioMacros,
   ] = await Promise.all([
     mediaMovilHastaMes(mes),
     mediaMovilHastaMes(mesAnt),
@@ -1877,6 +2059,7 @@ async function generarInformeMarkdown(mes) {
     obtenerCheckinPorMes(mes),
     obtenerCheckinPorMes(mesAnt),
     obtenerFotosPorMes(mes),
+    calcularPromedioMacrosMes(mes),
   ]);
 
   const lineas = [];
@@ -1961,6 +2144,16 @@ async function generarInformeMarkdown(mes) {
     if (ciAnterior?.pasos !== null && ciAnterior?.pasos !== undefined) {
       lineas.push(`- **Mes anterior:** ${ciAnterior.pasos.toLocaleString('es-ES')} pasos/día`);
     }
+    lineas.push('');
+  }
+
+  // ── Macros ────────────────────────────────────────────
+  if (promedioMacros.diasConDato > 0) {
+    lineas.push('## MACROS (promedio días registrados)');
+    lineas.push(`- **Días con registro:** ${promedioMacros.diasConDato} de ${promedioMacros.diasTotales}`);
+    if (promedioMacros.proteina !== null) lineas.push(`- **Proteína:**      ${promedioMacros.proteina} g/día`);
+    if (promedioMacros.carbos   !== null) lineas.push(`- **Carbohidratos:** ${promedioMacros.carbos} g/día`);
+    if (promedioMacros.grasas   !== null) lineas.push(`- **Grasas:**        ${promedioMacros.grasas} g/día`);
     lineas.push('');
   }
 
