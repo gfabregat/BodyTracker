@@ -594,15 +594,210 @@
   </div>
 
   <!-- ═══════════════════════════════════════
-       PANTALLA: DASHBOARD (placeholder Fase 5)
+       PANTALLA: DASHBOARD
   ════════════════════════════════════════ -->
-  <section id="screen-dashboard" class="screen flex-1 min-h-0 items-center justify-center">
-    <div class="text-center px-8">
-      <div class="text-4xl mb-4">📊</div>
-      <p class="text-text font-600 text-lg mb-2">Dashboard</p>
-      <p class="text-muted text-sm">Disponible en Fase 5</p>
+  <section id="screen-dashboard" class="screen flex-1 min-h-0 flex-col">
+
+    <!-- Header con selector de mes -->
+    <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <div>
+        <p class="text-muted text-xs font-medium uppercase tracking-widest">Resumen</p>
+        <h1 class="text-text text-xl font-700 leading-tight">Dashboard</h1>
+      </div>
+      <select id="dash-mes-selector"
+        class="px-3 py-2 rounded-xl text-sm font-600"
+        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none; max-width:160px;">
+      </select>
+    </header>
+
+    <!-- Contenido scrolleable -->
+    <div class="flex-1 min-h-0 scroll-y px-5 pb-4">
+
+      <!-- Empty state -->
+      <div id="dash-empty" class="hidden flex flex-col items-center justify-center py-16">
+        <p class="text-muted text-sm text-center">Todavía no hay datos suficientes.<br>Registrá tu peso durante algunos días para ver el dashboard.</p>
+      </div>
+
+      <!-- Contenido del dashboard -->
+      <div id="dash-contenido">
+
+        <!-- BLOQUE: Peso -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Peso</p>
+          <div class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <div class="flex items-end gap-3 mb-3">
+              <div>
+                <p class="text-muted text-xs mb-1">Media 7 días</p>
+                <div class="flex items-baseline gap-1">
+                  <span id="dash-peso-actual" class="text-text font-800" style="font-size:2.5rem; letter-spacing:-0.03em; line-height:1;">—</span>
+                  <span class="text-muted font-500">kg</span>
+                </div>
+              </div>
+              <div class="ml-auto text-right">
+                <p class="text-muted text-xs mb-1">vs mes anterior</p>
+                <p id="dash-peso-delta" class="font-700 text-lg">—</p>
+              </div>
+            </div>
+            <!-- Mini gráfico de tendencia 3 meses -->
+            <div style="position:relative; height:80px;">
+              <canvas id="dash-peso-chart"></canvas>
+              <div id="dash-peso-chart-empty" class="absolute inset-0 flex items-center justify-center">
+                <p class="text-muted text-xs">Sin datos suficientes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOQUE: Mediciones -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Mediciones</p>
+          <div id="dash-mediciones" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE: PRs -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Marcas personales</p>
+          <div id="dash-prs" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE: Fatiga -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fatiga subjetiva</p>
+          <div id="dash-fatiga" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE: Fotos -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fotos</p>
+          <div id="dash-fotos" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+      </div>
     </div>
   </section>
+
+  <!-- ═══════════════════════════════════════
+       PANTALLA: AJUSTES
+  ════════════════════════════════════════ -->
+  <section id="screen-ajustes" class="screen flex-1 min-h-0 flex-col">
+
+    <header class="flex items-center gap-3 px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <button id="btn-cerrar-ajustes"
+        class="w-9 h-9 flex items-center justify-center rounded-full transition-all active:scale-95"
+        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B; font-size:18px;">
+        ←
+      </button>
+      <h1 class="text-text text-xl font-700">Ajustes</h1>
+    </header>
+
+    <div class="flex-1 min-h-0 scroll-y px-5 pb-6">
+
+      <!-- Objetivo del ciclo -->
+      <div class="mb-6">
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Objetivo del ciclo</p>
+        <div class="rounded-2xl overflow-hidden" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+          <label class="flex items-center justify-between px-4 py-4 cursor-pointer" style="border-bottom:1px solid #2A2A2A;">
+            <div>
+              <p class="text-text text-sm font-600">Ganar masa</p>
+              <p class="text-muted text-xs">Subir de peso es positivo</p>
+            </div>
+            <input type="radio" name="objetivo" value="masa" class="ajuste-objetivo" style="accent-color:#C8F135; width:18px; height:18px;" />
+          </label>
+          <label class="flex items-center justify-between px-4 py-4 cursor-pointer" style="border-bottom:1px solid #2A2A2A;">
+            <div>
+              <p class="text-text text-sm font-600">Definición</p>
+              <p class="text-muted text-xs">Bajar de peso es positivo</p>
+            </div>
+            <input type="radio" name="objetivo" value="definicion" class="ajuste-objetivo" style="accent-color:#C8F135; width:18px; height:18px;" />
+          </label>
+          <label class="flex items-center justify-between px-4 py-4 cursor-pointer">
+            <div>
+              <p class="text-text text-sm font-600">Mantenimiento</p>
+              <p class="text-muted text-xs">Mantener el peso estable</p>
+            </div>
+            <input type="radio" name="objetivo" value="mantenimiento" class="ajuste-objetivo" style="accent-color:#C8F135; width:18px; height:18px;" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Backup -->
+      <div class="mb-6">
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Backup de datos</p>
+        <div class="rounded-2xl overflow-hidden" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+
+          <!-- Exportar -->
+          <div class="px-4 py-4" style="border-bottom:1px solid #2A2A2A;">
+            <p class="text-text text-sm font-600 mb-1">Exportar JSON</p>
+            <p class="text-muted text-xs mb-3">Descarga un archivo con todos tus datos. Las fotos se excluyen por defecto (pueden pesar varios MB).</p>
+            <div class="flex items-center gap-2 mb-3">
+              <input type="checkbox" id="export-incluir-fotos" style="accent-color:#C8F135; width:16px; height:16px;" />
+              <label for="export-incluir-fotos" class="text-muted text-xs cursor-pointer">Incluir fotos en el backup</label>
+            </div>
+            <button id="btn-exportar-json"
+              class="w-full py-3 rounded-xl text-sm font-700 transition-all active:scale-95"
+              style="background:#C8F135; color:#0D0D0D;">
+              Exportar datos
+            </button>
+          </div>
+
+          <!-- Importar -->
+          <div class="px-4 py-4">
+            <p class="text-text text-sm font-600 mb-1">Importar JSON</p>
+            <p class="text-muted text-xs mb-3">Restaura datos desde un backup. <span style="color:#FF4D4D; font-weight:600;">Esto reemplazará todos tus datos actuales.</span></p>
+            <button id="btn-importar-json"
+              class="w-full py-3 rounded-xl text-sm font-700 transition-all active:scale-95"
+              style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0;">
+              Seleccionar archivo de backup
+            </button>
+            <input type="file" id="import-file-input" accept=".json" class="hidden" />
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="rounded-2xl px-4 py-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-2">Información</p>
+        <p class="text-muted text-xs" style="line-height:1.6;">
+          Los datos se guardan localmente en este dispositivo. Limpiar la caché del navegador o desinstalar la app puede borrarlos. Exportá un backup periódicamente para no perder tu historial.
+        </p>
+        <p class="text-muted text-xs mt-3">Body Tracker PWA · v1.0</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Modal: confirmar importación -->
+  <div id="import-confirm-modal" class="hidden" style="
+    position:fixed; inset:0; z-index:3000;
+    background:rgba(0,0,0,0.85);
+    display:none; align-items:center; justify-content:center; padding:24px;">
+    <div class="w-full rounded-3xl p-6" style="background:#1A1A1A; border:1px solid #2A2A2A; max-width:360px;">
+      <p class="text-text font-700 text-base mb-2">¿Confirmar importación?</p>
+      <p class="text-muted text-sm mb-1" id="import-confirm-info"></p>
+      <p class="text-sm mb-5" style="color:#FF4D4D;">Esto reemplazará todos tus datos actuales. Esta acción no se puede deshacer.</p>
+      <div class="flex gap-3">
+        <button id="btn-import-cancelar"
+          class="flex-1 py-3 rounded-xl text-sm font-600"
+          style="background:transparent; border:1px solid #2A2A2A; color:#6B6B6B;">
+          Cancelar
+        </button>
+        <button id="btn-import-confirmar"
+          class="flex-1 py-3 rounded-xl text-sm font-700"
+          style="background:#FF4D4D; color:#fff;">
+          Importar
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════
        BARRA DE NAVEGACIÓN INFERIOR

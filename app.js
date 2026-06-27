@@ -13,6 +13,7 @@ const screens = {
   checkin:    document.getElementById('screen-checkin'),
   fotos:      document.getElementById('screen-fotos'),
   dashboard:  document.getElementById('screen-dashboard'),
+  ajustes:    document.getElementById('screen-ajustes'),
 };
 
 const navItems = document.querySelectorAll('.nav-item');
@@ -52,9 +53,15 @@ function navegarA(tab) {
     initFotosScreen();
   }
 
-  // Si vamos a dashboard, quitar badge
+  // Si vamos a dashboard, quitar badge y renderizar
   if (tab === 'dashboard') {
     ocultarDashboardBadge();
+    initDashboard();
+  }
+
+  // Si vamos a ajustes, inicializar
+  if (tab === 'ajustes') {
+    initAjustesScreen();
   }
 }
 
@@ -1535,22 +1542,420 @@ btnCompararFotos.addEventListener('click', mostrarVistaComparar);
 btnCerrarComparar.addEventListener('click', mostrarVistaGaleria);
 
 // ─────────────────────────────────────────────────────────
-//  AJUSTES (placeholder — Fase 5)
+//  DASHBOARD
 // ─────────────────────────────────────────────────────────
 
-document.getElementById('btn-settings').addEventListener('click', () => {
-  // TODO Fase 5: abrir pantalla de ajustes
-  const toast = document.createElement('div');
-  toast.textContent = 'Ajustes disponibles en Fase 5';
-  toast.style.cssText = `
-    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-    background: #1A1A1A; color: #6B6B6B; border: 1px solid #2A2A2A;
-    padding: 10px 20px; border-radius: 999px; font-size: 13px;
-    z-index: 9999; white-space: nowrap;
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+const dashMesSelector      = document.getElementById('dash-mes-selector');
+const dashEmpty            = document.getElementById('dash-empty');
+const dashContenido        = document.getElementById('dash-contenido');
+const dashPesoActual       = document.getElementById('dash-peso-actual');
+const dashPesoDelta        = document.getElementById('dash-peso-delta');
+const dashPesoChartEmpty   = document.getElementById('dash-peso-chart-empty');
+const dashMediciones       = document.getElementById('dash-mediciones');
+const dashPRs              = document.getElementById('dash-prs');
+const dashFatiga           = document.getElementById('dash-fatiga');
+const dashFotos            = document.getElementById('dash-fotos');
+
+let dashChart = null;
+let dashMesActivo = mesActual();
+
+async function initDashboard() {
+  // Poblar selector de meses con todos los meses que tienen algún dato
+  await poblarSelectorMeses();
+  dashMesActivo = dashMesSelector.value || mesActual();
+  await renderDashboard(dashMesActivo);
+}
+
+async function poblarSelectorMeses() {
+  // Recopilar todos los meses únicos de todos los stores
+  const [pesos, meds, checkins] = await Promise.all([
+    obtenerTodosLosPesos(),
+    obtenerTodasLasMediciones(),
+    obtenerTodosLosCheckins(),
+  ]);
+
+  const mesesSet = new Set();
+
+  // De pesos: extraer meses únicos
+  pesos.forEach(r => mesesSet.add(r.fecha.slice(0, 7)));
+  meds.forEach(r => mesesSet.add(r.fecha));
+  checkins.forEach(r => mesesSet.add(r.fecha));
+
+  // Siempre incluir el mes actual
+  mesesSet.add(mesActual());
+
+  const meses = [...mesesSet].sort().reverse();
+
+  dashMesSelector.innerHTML = meses.map(m =>
+    `<option value="${m}">${formatearMes(m)}</option>`
+  ).join('');
+
+  dashMesSelector.value = meses[0] || mesActual();
+}
+
+dashMesSelector.addEventListener('change', async () => {
+  dashMesActivo = dashMesSelector.value;
+  await renderDashboard(dashMesActivo);
 });
+
+async function renderDashboard(mes) {
+  const ajustes = cargarAjustes();
+  const mesAnt  = mesAnterior(mes);
+
+  // ── Peso ──────────────────────────────────────────────
+  const mediaActual   = await mediaMovilHastaMes(mes);
+  const mediaAnterior = await mediaMovilHastaMes(mesAnt);
+
+  if (mediaActual === null) {
+    dashEmpty.classList.remove('hidden');
+    dashContenido.style.display = 'none';
+    return;
+  }
+  dashEmpty.classList.add('hidden');
+  dashContenido.style.display = 'block';
+
+  dashPesoActual.textContent = mediaActual.toFixed(1);
+
+  if (mediaAnterior !== null) {
+    const diff = mediaActual - mediaAnterior;
+    const dir  = colorFlechaPeso(diff, ajustes.objetivo);
+    const signo = diff > 0 ? '+' : '';
+    const color = dir === 'mejor' ? '#C8F135' : dir === 'peor' ? '#FF4D4D' : '#6B6B6B';
+    const flecha = diff > 0.3 ? '↑' : diff < -0.3 ? '↓' : '→';
+    dashPesoDelta.innerHTML = `<span style="color:${color};">${flecha} ${signo}${diff.toFixed(1)} kg</span>`;
+  } else {
+    dashPesoDelta.textContent = '—';
+  }
+
+  // Mini gráfico 3 meses
+  await renderDashMiniChart(mes);
+
+  // ── Mediciones ────────────────────────────────────────
+  const medActual   = await obtenerMedicionPorMes(mes);
+  const medAnterior = await obtenerMedicionPorMes(mesAnt);
+
+  if (medActual) {
+    const dCintura   = medAnterior ? calcularDeltaMedicion(medAnterior.cintura,       medActual.cintura,       'cintura') : { valor: null, direccion: 'neutral' };
+    const dBrazoRel  = medAnterior ? calcularDeltaMedicion(medAnterior.brazoRelajado, medActual.brazoRelajado, 'brazo')   : { valor: null, direccion: 'neutral' };
+    const dBrazoCont = medAnterior ? calcularDeltaMedicion(medAnterior.brazoCont,     medActual.brazoCont,     'brazo')   : { valor: null, direccion: 'neutral' };
+
+    dashMediciones.innerHTML = `
+      <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">Cintura</p>
+          <p class="text-text font-700">${medActual.cintura.toFixed(1)} <span class="text-muted text-xs font-400">cm</span></p>
+          <p class="text-xs mt-1">${renderDeltaFlecha(dCintura)}</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">B.Relajado</p>
+          <p class="text-text font-700">${medActual.brazoRelajado.toFixed(1)} <span class="text-muted text-xs font-400">cm</span></p>
+          <p class="text-xs mt-1">${renderDeltaFlecha(dBrazoRel)}</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">B.Contraído</p>
+          <p class="text-text font-700">${medActual.brazoCont.toFixed(1)} <span class="text-muted text-xs font-400">cm</span></p>
+          <p class="text-xs mt-1">${renderDeltaFlecha(dBrazoCont)}</p>
+        </div>
+      </div>
+      ${medActual.muslo !== null ? `
+      <div class="rounded-xl p-3 mt-2" style="background:#0D0D0D;">
+        <p class="text-muted text-xs mb-1">Muslo derecho</p>
+        <p class="text-text font-700">${medActual.muslo.toFixed(1)} <span class="text-muted text-xs font-400">cm</span></p>
+        ${medAnterior?.muslo !== null ? `<p class="text-xs mt-1">${renderDeltaFlecha(calcularDeltaMedicion(medAnterior.muslo, medActual.muslo, 'muslo'))}</p>` : ''}
+      </div>` : ''}`;
+  } else {
+    dashMediciones.innerHTML = `<p class="text-muted text-sm">Sin medición registrada para este mes.</p>`;
+  }
+
+  // ── PRs ───────────────────────────────────────────────
+  const ciActual   = await obtenerCheckinPorMes(mes);
+  const ciAnterior = await obtenerCheckinPorMes(mesAnt);
+
+  if (ciActual) {
+    const dBanca     = calcularDeltaPR(ciAnterior?.banca,     ciActual.banca);
+    const dDominadas = calcularDeltaPR(ciAnterior?.dominadas, ciActual.dominadas);
+    const dRdl       = calcularDeltaPR(ciAnterior?.rdl,       ciActual.rdl);
+
+    dashPRs.innerHTML = `
+      <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
+        ${renderPRCard('Banca', ciActual.banca, dBanca)}
+        ${renderPRCard('Dominadas', ciActual.dominadas, dDominadas)}
+        ${renderPRCard('RDL', ciActual.rdl, dRdl)}
+      </div>`;
+  } else {
+    dashPRs.innerHTML = `<p class="text-muted text-sm">Sin check-in registrado para este mes.</p>`;
+  }
+
+  // ── Fatiga ────────────────────────────────────────────
+  if (ciActual?.fatiga !== null && ciActual?.fatiga !== undefined) {
+    const dFatiga = calcularDeltaFatiga(ciAnterior?.fatiga ?? null, ciActual.fatiga);
+    dashFatiga.innerHTML = `
+      <div class="flex items-center gap-4">
+        <span class="text-text font-800" style="font-size:2rem; letter-spacing:-0.02em;">${ciActual.fatiga}</span>
+        <span class="text-muted font-500">/10</span>
+        <span class="text-sm ml-auto">${renderDeltaFlecha(dFatiga, '')}</span>
+      </div>
+      ${renderBarraFatiga(ciActual.fatiga)}`;
+  } else {
+    dashFatiga.innerHTML = `<p class="text-muted text-sm">Sin fatiga registrada para este mes.</p>`;
+  }
+
+  // ── Fotos ─────────────────────────────────────────────
+  const fotosActual   = await obtenerFotosPorMes(mes);
+  const fotosAnterior = await obtenerFotosPorMes(mesAnt);
+
+  if (fotosActual || fotosAnterior) {
+    const thumbActual   = fotosActual   ? POSES.find(p => fotosActual[p])   : null;
+    const thumbAnterior = fotosAnterior ? POSES.find(p => fotosAnterior[p]) : null;
+
+    dashFotos.innerHTML = `
+      <div class="grid gap-3 mb-3" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <p class="text-muted text-xs mb-2 text-center">${formatearMes(mes)}</p>
+          <div class="rounded-xl overflow-hidden flex items-center justify-center"
+            style="aspect-ratio:3/4; background:#0D0D0D;">
+            ${thumbActual
+              ? `<img src="data:image/jpeg;base64,${fotosActual[thumbActual]}"
+                  style="width:100%; height:100%; object-fit:cover;" />`
+              : `<p class="text-muted text-xs">Sin foto</p>`}
+          </div>
+        </div>
+        <div>
+          <p class="text-muted text-xs mb-2 text-center">${formatearMes(mesAnt)}</p>
+          <div class="rounded-xl overflow-hidden flex items-center justify-center"
+            style="aspect-ratio:3/4; background:#0D0D0D;">
+            ${thumbAnterior
+              ? `<img src="data:image/jpeg;base64,${fotosAnterior[thumbAnterior]}"
+                  style="width:100%; height:100%; object-fit:cover;" />`
+              : `<p class="text-muted text-xs">Sin foto</p>`}
+          </div>
+        </div>
+      </div>
+      <button id="dash-btn-comparar"
+        class="w-full py-3 rounded-xl text-sm font-600 transition-all active:scale-95"
+        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B;">
+        Ver comparación completa →
+      </button>`;
+
+    document.getElementById('dash-btn-comparar')?.addEventListener('click', () => {
+      navegarA('fotos');
+      setTimeout(mostrarVistaComparar, 100);
+    });
+  } else {
+    dashFotos.innerHTML = `<p class="text-muted text-sm">Sin fotos registradas para este período.</p>`;
+  }
+}
+
+async function renderDashMiniChart(mes) {
+  const datos = await obtenerPesos3Meses(mes);
+
+  if (datos.length < 2) {
+    dashPesoChartEmpty.style.display = 'flex';
+    if (dashChart) { dashChart.destroy(); dashChart = null; }
+    return;
+  }
+  dashPesoChartEmpty.style.display = 'none';
+
+  const labels  = datos.map(r => r.fecha);
+  const medias  = datos.map(r => r.mediaMovil);
+
+  if (dashChart) {
+    dashChart.data.labels = labels;
+    dashChart.data.datasets[0].data = medias;
+    dashChart.update('active');
+    return;
+  }
+
+  const ctx = document.getElementById('dash-peso-chart').getContext('2d');
+  dashChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: medias,
+        borderColor: '#C8F135',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: 'rgba(200, 241, 53, 0.08)',
+        spanGaps: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false },
+        zoom: { pan: { enabled: false }, zoom: { pinch: { enabled: false }, wheel: { enabled: false } } },
+      },
+      scales: {
+        x: { display: false },
+        y: { display: false, grace: '10%' },
+      },
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+//  AJUSTES
+// ─────────────────────────────────────────────────────────
+
+const ajusteObjetivoBtns  = document.querySelectorAll('.ajuste-objetivo');
+const btnExportarJSON      = document.getElementById('btn-exportar-json');
+const btnImportarJSON      = document.getElementById('btn-importar-json');
+const importFileInput      = document.getElementById('import-file-input');
+const importConfirmModal   = document.getElementById('import-confirm-modal');
+const importConfirmInfo    = document.getElementById('import-confirm-info');
+const btnImportCancelar    = document.getElementById('btn-import-cancelar');
+const btnImportConfirmar   = document.getElementById('btn-import-confirmar');
+const exportIncluirFotos   = document.getElementById('export-incluir-fotos');
+
+let importDatosPendientes = null;
+
+function initAjustesScreen() {
+  const ajustes = cargarAjustes();
+  // Marcar el radio correcto
+  ajusteObjetivoBtns.forEach(radio => {
+    radio.checked = radio.value === ajustes.objetivo;
+  });
+}
+
+// Cambio de objetivo — guardar inmediatamente
+ajusteObjetivoBtns.forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.checked) {
+      const ajustes = cargarAjustes();
+      ajustes.objetivo = radio.value;
+      guardarAjustes(ajustes);
+      mostrarToast('✓ Objetivo actualizado', '#C8F135');
+    }
+  });
+});
+
+// Exportar JSON
+btnExportarJSON.addEventListener('click', async () => {
+  const incluirFotos = exportIncluirFotos.checked;
+  btnExportarJSON.textContent = 'Exportando...';
+  btnExportarJSON.style.opacity = '0.6';
+
+  try {
+    const datos = await exportarDatos(incluirFotos);
+    const json  = JSON.stringify(datos, null, 2);
+    const blob  = new Blob([json], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const fecha = new Date().toISOString().slice(0, 10);
+    const a     = document.createElement('a');
+    a.href     = url;
+    a.download = `bodytracker-backup-${fecha}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    mostrarToast('✓ Backup descargado', '#C8F135');
+  } catch (err) {
+    console.error('[Export] Error:', err);
+    mostrarToast('✗ Error al exportar', '#FF4D4D');
+  } finally {
+    btnExportarJSON.textContent = 'Exportar datos';
+    btnExportarJSON.style.opacity = '1';
+  }
+});
+
+// Importar JSON — seleccionar archivo
+btnImportarJSON.addEventListener('click', () => importFileInput.click());
+
+importFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  importFileInput.value = '';
+  if (!file) return;
+
+  try {
+    const texto = await file.text();
+    const datos = JSON.parse(texto);
+
+    if (!datos.version || !datos.Registro_Peso) {
+      mostrarToast('✗ Archivo inválido', '#FF4D4D');
+      return;
+    }
+
+    importDatosPendientes = datos;
+
+    // Mostrar modal de confirmación con resumen
+    const nPesos     = datos.Registro_Peso?.length ?? 0;
+    const nMeds      = datos.Mediciones_Corporales?.length ?? 0;
+    const nCheckins  = datos.Checkin_Mensual?.length ?? 0;
+    const nFotos     = datos.Fotos_Progreso?.length ?? 0;
+    const fechaExport = datos.exportadoEn
+      ? new Date(datos.exportadoEn).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+      : 'fecha desconocida';
+
+    importConfirmInfo.innerHTML = `
+      Backup del <strong style="color:#F0F0F0;">${fechaExport}</strong><br>
+      ${nPesos} registros de peso · ${nMeds} mediciones · ${nCheckins} check-ins · ${nFotos} meses de fotos`;
+
+    importConfirmModal.style.display = 'flex';
+    importConfirmModal.classList.remove('hidden');
+  } catch (err) {
+    mostrarToast('✗ Error al leer el archivo', '#FF4D4D');
+  }
+});
+
+btnImportCancelar.addEventListener('click', () => {
+  importConfirmModal.style.display = 'none';
+  importConfirmModal.classList.add('hidden');
+  importDatosPendientes = null;
+});
+
+btnImportConfirmar.addEventListener('click', async () => {
+  if (!importDatosPendientes) return;
+
+  btnImportConfirmar.textContent = 'Importando...';
+  btnImportConfirmar.style.opacity = '0.6';
+
+  try {
+    await importarDatos(importDatosPendientes);
+    importConfirmModal.style.display = 'none';
+    importConfirmModal.classList.add('hidden');
+    importDatosPendientes = null;
+    mostrarToast('✓ Datos importados correctamente', '#C8F135');
+
+    // Refrescar la pantalla de peso
+    await initPesoScreen();
+  } catch (err) {
+    console.error('[Import] Error:', err);
+    mostrarToast('✗ Error al importar los datos', '#FF4D4D');
+  } finally {
+    btnImportConfirmar.textContent = 'Importar';
+    btnImportConfirmar.style.opacity = '1';
+  }
+});
+
+// Botón ajustes del header de peso
+document.getElementById('btn-settings').addEventListener('click', () => {
+  navegarA('ajustes');
+});
+
+// Botón cerrar ajustes
+document.getElementById('btn-cerrar-ajustes').addEventListener('click', () => {
+  navegarA('peso');
+});
+
+// ─────────────────────────────────────────────────────────
+//  UTILIDAD: TOAST GENÉRICO
+// ─────────────────────────────────────────────────────────
+
+function mostrarToast(texto, color = '#C8F135') {
+  const toast = document.createElement('div');
+  toast.textContent = texto;
+  toast.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#1A1A1A; color:${color}; border:1px solid #2A2A2A;
+    padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
+    z-index:9999; white-space:nowrap; pointer-events:none;`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
 
 // ─────────────────────────────────────────────────────────
 //  SERVICE WORKER

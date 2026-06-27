@@ -445,3 +445,145 @@ function comprimirImagen(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ─────────────────────────────────────────────────────────
+//  AJUSTES
+// ─────────────────────────────────────────────────────────
+
+const AJUSTES_KEY = 'bodytracker_ajustes';
+
+const AJUSTES_DEFAULT = {
+  objetivo: 'mantenimiento', // 'masa' | 'definicion' | 'mantenimiento'
+};
+
+function cargarAjustes() {
+  try {
+    const raw = localStorage.getItem(AJUSTES_KEY);
+    return raw ? { ...AJUSTES_DEFAULT, ...JSON.parse(raw) } : { ...AJUSTES_DEFAULT };
+  } catch {
+    return { ...AJUSTES_DEFAULT };
+  }
+}
+
+function guardarAjustes(ajustes) {
+  localStorage.setItem(AJUSTES_KEY, JSON.stringify(ajustes));
+}
+
+// ─────────────────────────────────────────────────────────
+//  BACKUP — Exportar / Importar JSON
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Exporta todos los datos a un objeto JSON.
+ * @param {boolean} incluirFotos
+ */
+async function exportarDatos(incluirFotos = false) {
+  const [pesos, mediciones, checkins, fotos] = await Promise.all([
+    obtenerTodosLosPesos(),
+    obtenerTodasLasMediciones(),
+    obtenerTodosLosCheckins(),
+    incluirFotos ? obtenerTodasLasFotos() : Promise.resolve([]),
+  ]);
+
+  return {
+    version: 1,
+    exportadoEn: new Date().toISOString(),
+    ajustes: cargarAjustes(),
+    Registro_Peso: pesos,
+    Mediciones_Corporales: mediciones,
+    Checkin_Mensual: checkins,
+    Fotos_Progreso: incluirFotos ? fotos : [],
+    _fotosIncluidas: incluirFotos,
+  };
+}
+
+/**
+ * Importa datos desde un objeto JSON.
+ * Reemplaza completamente los datos existentes.
+ * @param {object} datos - objeto parseado del JSON
+ */
+async function importarDatos(datos) {
+  if (!datos.version || !datos.Registro_Peso) {
+    throw new Error('Formato de backup inválido');
+  }
+
+  // Limpiar stores existentes
+  await Promise.all([
+    db.Registro_Peso.clear(),
+    db.Mediciones_Corporales.clear(),
+    db.Checkin_Mensual.clear(),
+    db.Fotos_Progreso.clear(),
+  ]);
+
+  // Importar cada store
+  if (datos.Registro_Peso?.length)       await db.Registro_Peso.bulkPut(datos.Registro_Peso);
+  if (datos.Mediciones_Corporales?.length) await db.Mediciones_Corporales.bulkPut(datos.Mediciones_Corporales);
+  if (datos.Checkin_Mensual?.length)     await db.Checkin_Mensual.bulkPut(datos.Checkin_Mensual);
+  if (datos.Fotos_Progreso?.length)      await db.Fotos_Progreso.bulkPut(datos.Fotos_Progreso);
+
+  // Restaurar ajustes si vienen en el backup
+  if (datos.ajustes) guardarAjustes(datos.ajustes);
+}
+
+// ─────────────────────────────────────────────────────────
+//  DASHBOARD — Cálculos
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Devuelve YYYY-MM del mes anterior a uno dado.
+ */
+function mesAnterior(mesISO) {
+  const [y, m] = mesISO.split('-').map(Number);
+  const d = new Date(y, m - 1, 0); // último día del mes anterior
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Calcula la media de los últimos 7 registros de peso hasta un mes dado.
+ */
+async function mediaMovilHastaMes(mesISO) {
+  const [y, m] = mesISO.split('-').map(Number);
+  const ultimoDia = new Date(y, m, 0); // último día del mes
+  const fechaHasta = ultimoDia.toISOString().slice(0, 10);
+
+  const registros = await db.Registro_Peso
+    .where('fecha')
+    .belowOrEqual(fechaHasta)
+    .reverse()
+    .limit(7)
+    .toArray();
+
+  if (!registros.length) return null;
+  const suma = registros.reduce((acc, r) => acc + r.peso, 0);
+  return Math.round((suma / registros.length) * 100) / 100;
+}
+
+/**
+ * Obtiene los datos de peso de los últimos 3 meses para el mini gráfico.
+ */
+async function obtenerPesos3Meses(mesISO) {
+  const [y, m] = mesISO.split('-').map(Number);
+  const desde = new Date(y, m - 3, 1);
+  const hasta = new Date(y, m, 0);
+  const fechaDesde = desde.toISOString().slice(0, 10);
+  const fechaHasta = hasta.toISOString().slice(0, 10);
+
+  return db.Registro_Peso
+    .where('fecha')
+    .between(fechaDesde, fechaHasta, true, true)
+    .sortBy('fecha');
+}
+
+/**
+ * Determina el color de flecha para el peso según el objetivo del ciclo.
+ * @param {number} diff - delta de peso (actual - anterior)
+ * @param {string} objetivo - 'masa' | 'definicion' | 'mantenimiento'
+ */
+function colorFlechaPeso(diff, objetivo) {
+  const umbral = 0.3;
+  if (Math.abs(diff) < umbral) return 'neutral';
+  if (objetivo === 'masa')        return diff > 0 ? 'mejor' : 'peor';
+  if (objetivo === 'definicion')  return diff < 0 ? 'mejor' : 'peor';
+  // mantenimiento: cualquier cambio > umbral es neutro-adverso
+  return 'neutral';
+}
