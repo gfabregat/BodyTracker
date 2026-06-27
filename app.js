@@ -36,6 +36,11 @@ function navegarA(tab) {
   if (tab === 'peso') {
     initPesoScreen();
   }
+
+  // Si vamos a mediciones, refrescar
+  if (tab === 'mediciones') {
+    initMedicionesScreen();
+  }
 }
 
 navItems.forEach(item => {
@@ -407,6 +412,366 @@ btnResetZoom.addEventListener('click', () => {
     weightChart.resetZoom();
     btnResetZoom.classList.add('hidden');
   }
+});
+
+// ─────────────────────────────────────────────────────────
+//  PANTALLA DE MEDICIONES
+// ─────────────────────────────────────────────────────────
+
+let medChart = null;
+let medVarActual = 'cintura';
+let medEditandoMes = null; // null = nueva, 'YYYY-MM' = editando
+
+const medFormContainer  = document.getElementById('med-form-container');
+const medFormTitulo     = document.getElementById('med-form-titulo');
+const medMesLabel       = document.getElementById('med-mes-label');
+const btnNuevaMedicion  = document.getElementById('btn-nueva-medicion');
+const btnMedGuardar     = document.getElementById('btn-med-guardar');
+const btnMedCancelar    = document.getElementById('btn-med-cancelar');
+const inputCintura      = document.getElementById('med-cintura');
+const inputBrazoRel     = document.getElementById('med-brazo-rel');
+const inputBrazoCont    = document.getElementById('med-brazo-cont');
+const inputMuslo        = document.getElementById('med-muslo');
+const medMiniTabla      = document.getElementById('med-mini-tabla');
+const medMiniTablaEmpty = document.getElementById('med-mini-tabla-empty');
+const medHistorial      = document.getElementById('med-historial');
+const medHistorialEmpty = document.getElementById('med-historial-empty');
+const medChartEmpty     = document.getElementById('med-chart-empty');
+const medVarBtns        = document.querySelectorAll('.med-var-btn');
+
+async function initMedicionesScreen() {
+  medMesLabel.textContent = formatearMes(mesActual());
+  await renderMedicionesUI();
+}
+
+async function renderMedicionesUI() {
+  const todas = await obtenerTodasLasMediciones(); // ordenadas ASC
+
+  renderMiniTabla(todas);
+  renderHistorialCompleto(todas);
+  await actualizarGraficoMediciones(todas);
+
+  // Mostrar/ocultar botón Nueva según si ya existe registro este mes
+  const hayMesActual = todas.some(m => m.fecha === mesActual());
+  btnNuevaMedicion.textContent = hayMesActual ? '✎ Editar' : '+ Nueva';
+}
+
+// ── Mini tabla (últimos 3) ──────────────────────────────
+
+function renderMiniTabla(todas) {
+  const ultimas = todas.slice(-3).reverse(); // más reciente primero
+
+  if (!ultimas.length) {
+    medMiniTablaEmpty.classList.remove('hidden');
+    medMiniTabla.innerHTML = '';
+    medMiniTabla.style.display = 'none';
+    return;
+  }
+
+  medMiniTablaEmpty.classList.add('hidden');
+  medMiniTabla.style.display = 'block';
+
+  // Cabecera
+  const headerHTML = `
+    <div class="grid text-muted text-xs font-500 px-3 py-2"
+      style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; border-bottom:1px solid #2A2A2A;">
+      <span>Mes</span>
+      <span class="text-center">Cintura</span>
+      <span class="text-center">B.Rel</span>
+      <span class="text-center">B.Cont</span>
+      <span class="text-center">Muslo</span>
+    </div>`;
+
+  const filasHTML = ultimas.map((reg, i) => {
+    const anterior = ultimas[i + 1] || null; // el siguiente en el array invertido es el anterior en tiempo
+
+    const dCintura   = anterior ? calcularDeltaMedicion(anterior.cintura,       reg.cintura,    'cintura') : { valor: null, direccion: 'neutral' };
+    const dBrazoRel  = anterior ? calcularDeltaMedicion(anterior.brazoRelajado, reg.brazoRelajado, 'brazo') : { valor: null, direccion: 'neutral' };
+    const dBrazoCont = anterior ? calcularDeltaMedicion(anterior.brazoCont,     reg.brazoCont,  'brazo') : { valor: null, direccion: 'neutral' };
+    const dMuslo     = anterior ? calcularDeltaMedicion(anterior.muslo,         reg.muslo,      'muslo') : { valor: null, direccion: 'neutral' };
+
+    const mesCorto = (() => {
+      const [y, m] = reg.fecha.split('-').map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+    })();
+
+    return `
+      <div class="grid px-3 py-3 text-sm ${i < ultimas.length - 1 ? 'border-b' : ''}"
+        style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; border-color:#2A2A2A;">
+        <span class="text-muted text-xs" style="align-self:center;">${mesCorto}</span>
+        <span class="text-center font-600 text-xs" style="align-self:center;">
+          ${reg.cintura.toFixed(1)}<br>
+          <small>${renderDeltaFlecha(dCintura)}</small>
+        </span>
+        <span class="text-center font-600 text-xs" style="align-self:center;">
+          ${reg.brazoRelajado.toFixed(1)}<br>
+          <small>${renderDeltaFlecha(dBrazoRel)}</small>
+        </span>
+        <span class="text-center font-600 text-xs" style="align-self:center;">
+          ${reg.brazoCont.toFixed(1)}<br>
+          <small>${renderDeltaFlecha(dBrazoCont)}</small>
+        </span>
+        <span class="text-center font-600 text-xs" style="align-self:center;">
+          ${reg.muslo !== null ? reg.muslo.toFixed(1) : '<span style="color:#6B6B6B">—</span>'}<br>
+          <small>${reg.muslo !== null ? renderDeltaFlecha(dMuslo) : '<span style="color:#6B6B6B">—</span>'}</small>
+        </span>
+      </div>`;
+  }).join('');
+
+  medMiniTabla.innerHTML = headerHTML + filasHTML;
+}
+
+// ── Historial completo ──────────────────────────────────
+
+function renderHistorialCompleto(todas) {
+  const invertidas = [...todas].reverse();
+
+  if (!invertidas.length) {
+    medHistorialEmpty.classList.remove('hidden');
+    medHistorial.innerHTML = '';
+    return;
+  }
+
+  medHistorialEmpty.classList.add('hidden');
+
+  medHistorial.innerHTML = invertidas.map((reg, i) => {
+    const anterior = invertidas[i + 1] || null;
+
+    const dCintura   = anterior ? calcularDeltaMedicion(anterior.cintura,       reg.cintura,       'cintura') : { valor: null, direccion: 'neutral' };
+    const dBrazoRel  = anterior ? calcularDeltaMedicion(anterior.brazoRelajado, reg.brazoRelajado, 'brazo')   : { valor: null, direccion: 'neutral' };
+    const dBrazoCont = anterior ? calcularDeltaMedicion(anterior.brazoCont,     reg.brazoCont,     'brazo')   : { valor: null, direccion: 'neutral' };
+    const dMuslo     = anterior && reg.muslo !== null && anterior.muslo !== null
+      ? calcularDeltaMedicion(anterior.muslo, reg.muslo, 'muslo')
+      : { valor: null, direccion: 'neutral' };
+
+    return `
+      <div class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-text font-600 text-sm">${formatearMes(reg.fecha)}</span>
+          <button class="med-editar-btn text-xs px-3 py-1 rounded-lg"
+            data-mes="${reg.fecha}"
+            style="background:#2A2A2A; color:#6B6B6B;">
+            Editar
+          </button>
+        </div>
+        <div class="grid gap-2" style="grid-template-columns: 1fr 1fr;">
+          <div class="rounded-xl p-3" style="background:#0D0D0D;">
+            <p class="text-muted text-xs mb-1">Cintura</p>
+            <p class="text-text font-700">${reg.cintura.toFixed(1)} <span class="text-muted font-400 text-xs">cm</span></p>
+            <p class="text-xs mt-1">${renderDeltaFlecha(dCintura)}</p>
+          </div>
+          <div class="rounded-xl p-3" style="background:#0D0D0D;">
+            <p class="text-muted text-xs mb-1">Brazo relajado</p>
+            <p class="text-text font-700">${reg.brazoRelajado.toFixed(1)} <span class="text-muted font-400 text-xs">cm</span></p>
+            <p class="text-xs mt-1">${renderDeltaFlecha(dBrazoRel)}</p>
+          </div>
+          <div class="rounded-xl p-3" style="background:#0D0D0D;">
+            <p class="text-muted text-xs mb-1">Brazo contraído</p>
+            <p class="text-text font-700">${reg.brazoCont.toFixed(1)} <span class="text-muted font-400 text-xs">cm</span></p>
+            <p class="text-xs mt-1">${renderDeltaFlecha(dBrazoCont)}</p>
+          </div>
+          <div class="rounded-xl p-3" style="background:#0D0D0D;">
+            <p class="text-muted text-xs mb-1">Muslo derecho</p>
+            ${reg.muslo !== null
+              ? `<p class="text-text font-700">${reg.muslo.toFixed(1)} <span class="text-muted font-400 text-xs">cm</span></p>
+                 <p class="text-xs mt-1">${renderDeltaFlecha(dMuslo)}</p>`
+              : `<p class="text-muted text-sm">—</p>`
+            }
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Botones de editar en historial
+  document.querySelectorAll('.med-editar-btn').forEach(btn => {
+    btn.addEventListener('click', () => abrirFormEdicion(btn.dataset.mes));
+  });
+}
+
+// ── Gráfico de mediciones ───────────────────────────────
+
+const MED_VAR_CONFIG = {
+  cintura:   { label: 'Cintura',        campo: 'cintura',       color: '#C8F135' },
+  brazoRel:  { label: 'Brazo relajado', campo: 'brazoRelajado', color: '#4FC3F7' },
+  brazoCont: { label: 'Brazo contraído',campo: 'brazoCont',     color: '#FFB347' },
+  muslo:     { label: 'Muslo derecho',  campo: 'muslo',         color: '#CE93D8' },
+};
+
+async function actualizarGraficoMediciones(todas) {
+  const config = MED_VAR_CONFIG[medVarActual];
+  const datos = todas.filter(r => r[config.campo] !== null && r[config.campo] !== undefined);
+
+  if (datos.length < 2) {
+    medChartEmpty.style.display = 'flex';
+    if (medChart) { medChart.destroy(); medChart = null; }
+    return;
+  }
+  medChartEmpty.style.display = 'none';
+
+  const labels = datos.map(r => {
+    const [y, m] = r.fecha.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+  });
+  const valores = datos.map(r => r[config.campo]);
+
+  if (medChart) {
+    medChart.data.labels = labels;
+    medChart.data.datasets[0].data = valores;
+    medChart.data.datasets[0].borderColor = config.color;
+    medChart.data.datasets[0].pointBackgroundColor = config.color;
+    medChart.data.datasets[0].label = config.label;
+    medChart.update('active');
+    return;
+  }
+
+  const ctx = document.getElementById('med-chart').getContext('2d');
+  medChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: config.label,
+        data: valores,
+        borderColor: config.color,
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: config.color,
+        pointHoverRadius: 7,
+        tension: 0.3,
+        fill: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1A1A1A',
+          borderColor: '#2A2A2A',
+          borderWidth: 1,
+          titleColor: '#6B6B6B',
+          bodyColor: '#F0F0F0',
+          padding: 10,
+          callbacks: {
+            label: (item) => `${config.label}: ${item.raw.toFixed(1)} cm`,
+          },
+        },
+        zoom: { pan: { enabled: false }, zoom: { pinch: { enabled: false }, wheel: { enabled: false } } },
+      },
+      scales: {
+        x: {
+          grid: { color: '#2A2A2A', drawBorder: false },
+          ticks: { color: '#6B6B6B', font: { size: 11, family: 'Inter' }, maxRotation: 0 },
+        },
+        y: {
+          grid: { color: '#2A2A2A', drawBorder: false },
+          ticks: { color: '#6B6B6B', font: { size: 11, family: 'Inter' }, callback: v => `${v} cm`, maxTicksLimit: 5 },
+          grace: '5%',
+        },
+      },
+    },
+  });
+}
+
+// Selector de variable del gráfico
+medVarBtns.forEach(btn => {
+  btn.addEventListener('click', async () => {
+    medVarActual = btn.dataset.var;
+    medVarBtns.forEach(b => {
+      b.style.background = '#1A1A1A';
+      b.style.color = '#6B6B6B';
+      b.style.border = '1px solid #2A2A2A';
+    });
+    btn.style.background = '#C8F135';
+    btn.style.color = '#0D0D0D';
+    btn.style.border = 'none';
+    if (medChart) { medChart.destroy(); medChart = null; }
+    const todas = await obtenerTodasLasMediciones();
+    await actualizarGraficoMediciones(todas);
+  });
+});
+
+// ── Formulario ──────────────────────────────────────────
+
+function abrirFormNueva() {
+  medEditandoMes = null;
+  medFormTitulo.textContent = 'Nueva medición — ' + formatearMes(mesActual());
+  inputCintura.value = '';
+  inputBrazoRel.value = '';
+  inputBrazoCont.value = '';
+  inputMuslo.value = '';
+  medFormContainer.classList.remove('hidden');
+  // Scroll al form
+  medFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => inputCintura.focus(), 300);
+}
+
+async function abrirFormEdicion(mes) {
+  const reg = await obtenerMedicionPorMes(mes);
+  if (!reg) return;
+  medEditandoMes = mes;
+  medFormTitulo.textContent = 'Editando — ' + formatearMes(mes);
+  inputCintura.value    = reg.cintura.toFixed(1);
+  inputBrazoRel.value   = reg.brazoRelajado.toFixed(1);
+  inputBrazoCont.value  = reg.brazoCont.toFixed(1);
+  inputMuslo.value      = reg.muslo !== null ? reg.muslo.toFixed(1) : '';
+  medFormContainer.classList.remove('hidden');
+  medFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => inputCintura.focus(), 300);
+}
+
+function cerrarForm() {
+  medFormContainer.classList.add('hidden');
+  medEditandoMes = null;
+}
+
+function validarInputMedicion(input, label) {
+  const v = parseFloat(input.value);
+  if (isNaN(v) || v <= 0) {
+    input.style.borderColor = '#FF4D4D';
+    setTimeout(() => { input.style.borderColor = '#2A2A2A'; }, 1000);
+    return null;
+  }
+  input.style.borderColor = '#2A2A2A';
+  return v;
+}
+
+btnNuevaMedicion.addEventListener('click', abrirFormNueva);
+btnMedCancelar.addEventListener('click', cerrarForm);
+
+btnMedGuardar.addEventListener('click', async () => {
+  const cintura    = validarInputMedicion(inputCintura,   'Cintura');
+  const brazoRel   = validarInputMedicion(inputBrazoRel,  'Brazo relajado');
+  const brazoCont  = validarInputMedicion(inputBrazoCont, 'Brazo contraído');
+
+  if (cintura === null || brazoRel === null || brazoCont === null) return;
+
+  const musloVal = inputMuslo.value.trim();
+  const muslo = musloVal !== '' ? parseFloat(musloVal) : null;
+  if (muslo !== null && (isNaN(muslo) || muslo <= 0)) {
+    inputMuslo.style.borderColor = '#FF4D4D';
+    setTimeout(() => { inputMuslo.style.borderColor = '#2A2A2A'; }, 1000);
+    return;
+  }
+
+  const mes = medEditandoMes || mesActual();
+  await guardarMedicion(mes, { cintura, brazoRelajado: brazoRel, brazoCont, muslo });
+
+  cerrarForm();
+  await renderMedicionesUI();
+
+  // Feedback visual breve
+  const toast = document.createElement('div');
+  toast.textContent = '✓ Medición guardada';
+  toast.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
+    padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
+    z-index:9999; white-space:nowrap; pointer-events:none;`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 });
 
 // ─────────────────────────────────────────────────────────
