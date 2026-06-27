@@ -135,3 +135,112 @@ async function seedTestData(diasAtras = 60, pesoBase = 82.0) {
 // Exponer al scope global para uso desde consola DevTools
 window.seedTestData = seedTestData;
 window.db = db;
+
+// ─────────────────────────────────────────────────────────
+//  MEDICIONES CORPORALES
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Devuelve el mes actual en formato YYYY-MM.
+ */
+function mesActual() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+/**
+ * Guarda (o actualiza) la medición del mes indicado.
+ * @param {string} mes       - YYYY-MM (clave primaria)
+ * @param {object} datos     - { cintura, brazoRelajado, brazoCont, muslo }
+ *                             muslo puede ser null si no se registra
+ */
+async function guardarMedicion(mes, datos) {
+  await db.Mediciones_Corporales.put({
+    fecha: mes,
+    cintura:       datos.cintura,
+    brazoRelajado: datos.brazoRelajado,
+    brazoCont:     datos.brazoCont,
+    muslo:         datos.muslo ?? null,
+  });
+}
+
+/**
+ * Obtiene la medición de un mes específico.
+ * @param {string} mes - YYYY-MM
+ * @returns {object|undefined}
+ */
+async function obtenerMedicionPorMes(mes) {
+  return db.Mediciones_Corporales.get(mes);
+}
+
+/**
+ * Obtiene todas las mediciones ordenadas por fecha ascendente.
+ * @returns {Array}
+ */
+async function obtenerTodasLasMediciones() {
+  return db.Mediciones_Corporales.orderBy('fecha').toArray();
+}
+
+/**
+ * Calcula el delta entre dos valores de medición.
+ * Devuelve { valor, direccion } donde dirección es 'mejor', 'peor' o 'neutral'.
+ * @param {number|null} anterior
+ * @param {number|null} actual
+ * @param {string} campo - 'cintura' | 'brazo' | 'muslo'
+ * @param {string} objetivo - 'masa' | 'definicion' | 'mantenimiento'
+ */
+function calcularDeltaMedicion(anterior, actual, campo, objetivo = 'mantenimiento') {
+  if (anterior === null || actual === null) return { valor: null, direccion: 'neutral' };
+
+  const diff = actual - anterior;
+  const umbral = campo === 'cintura' ? 0.5 : 0.1;
+
+  if (Math.abs(diff) < umbral) return { valor: diff, direccion: 'neutral' };
+
+  // Lógica de "mejora" según campo y objetivo
+  let esMejora;
+  if (campo === 'cintura') {
+    // Cintura: bajar siempre es positivo en definición/mantenimiento,
+    // neutro en masa (se acepta algo de cintura al ganar masa)
+    esMejora = diff < 0;
+  } else {
+    // Brazo y muslo: subir es siempre positivo (más músculo)
+    esMejora = diff > 0;
+  }
+
+  return {
+    valor: diff,
+    direccion: esMejora ? 'mejor' : 'peor',
+  };
+}
+
+/**
+ * Genera el HTML de una flecha de delta con color.
+ * @param {object} delta - resultado de calcularDeltaMedicion
+ * @param {string} unidad - 'cm' por defecto
+ */
+function renderDeltaFlecha(delta, unidad = 'cm') {
+  if (delta.valor === null) return '<span style="color:#6B6B6B">—</span>';
+
+  const signo = delta.valor > 0 ? '+' : '';
+  const valorStr = `${signo}${delta.valor.toFixed(1)} ${unidad}`;
+
+  if (delta.direccion === 'neutral') {
+    return `<span style="color:#6B6B6B">→ ${valorStr}</span>`;
+  }
+  if (delta.direccion === 'mejor') {
+    return `<span style="color:#C8F135">↑ ${valorStr}</span>`;
+  }
+  return `<span style="color:#FF4D4D">↓ ${valorStr}</span>`;
+}
+
+/**
+ * Formatea YYYY-MM a nombre de mes legible.
+ */
+function formatearMes(mesISO) {
+  const [y, m] = mesISO.split('-').map(Number);
+  const fecha = new Date(y, m - 1, 1);
+  return fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
