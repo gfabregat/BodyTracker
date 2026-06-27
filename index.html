@@ -220,13 +220,118 @@
   </section>
 
   <!-- ═══════════════════════════════════════
-       PANTALLA: MEDICIONES (placeholder Fase 2)
+       PANTALLA: MEDICIONES CORPORALES
   ════════════════════════════════════════ -->
-  <section id="screen-mediciones" class="screen flex-1 min-h-0 items-center justify-center">
-    <div class="text-center px-8">
-      <div class="text-4xl mb-4">📏</div>
-      <p class="text-text font-600 text-lg mb-2">Mediciones corporales</p>
-      <p class="text-muted text-sm">Disponible en Fase 2</p>
+  <section id="screen-mediciones" class="screen flex-1 min-h-0 flex-col">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <div>
+        <p id="med-mes-label" class="text-muted text-xs font-medium uppercase tracking-widest"></p>
+        <h1 class="text-text text-xl font-700 leading-tight">Mediciones</h1>
+      </div>
+      <button id="btn-nueva-medicion"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+        style="background:#C8F135; color:#0D0D0D; min-height:40px;">
+        + Nueva
+      </button>
+    </header>
+
+    <!-- Contenido scrolleable -->
+    <div class="flex-1 min-h-0 scroll-y px-5 pb-4">
+
+      <!-- FORMULARIO -->
+      <div id="med-form-container" class="hidden mb-5">
+        <div class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+          <p class="text-text font-600 mb-4" id="med-form-titulo">Nueva medición</p>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Cintura (cm) *</label>
+            <input id="med-cintura" type="number" inputmode="decimal" step="0.1" min="40" max="200"
+              placeholder="ej: 82.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Brazo relajado (cm) *</label>
+            <input id="med-brazo-rel" type="number" inputmode="decimal" step="0.1" min="20" max="80"
+              placeholder="ej: 36.5"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Brazo contraído (cm) *</label>
+            <input id="med-brazo-cont" type="number" inputmode="decimal" step="0.1" min="20" max="80"
+              placeholder="ej: 38.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-5">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">
+              Muslo derecho (cm) <span style="color:#6B6B6B; font-weight:400;">opcional</span>
+            </label>
+            <input id="med-muslo" type="number" inputmode="decimal" step="0.1" min="30" max="120"
+              placeholder="ej: 58.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="flex gap-3">
+            <button id="btn-med-cancelar"
+              class="flex-1 py-3 rounded-xl text-sm font-600 transition-all active:scale-95"
+              style="background:transparent; border:1px solid #2A2A2A; color:#6B6B6B;">
+              Cancelar
+            </button>
+            <button id="btn-med-guardar"
+              class="flex-1 py-3 rounded-xl text-sm font-700 transition-all active:scale-95"
+              style="background:#C8F135; color:#0D0D0D;">
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MINI-TABLA: últimos 3 registros -->
+      <div class="mb-5">
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Últimos 3 registros</p>
+        <div id="med-mini-tabla-empty" class="py-6 text-center hidden">
+          <p class="text-muted text-sm">Todavía no hay mediciones registradas.</p>
+        </div>
+        <div id="med-mini-tabla" class="rounded-2xl overflow-hidden" style="border:1px solid #2A2A2A;">
+        </div>
+      </div>
+
+      <!-- GRÁFICO -->
+      <div class="mb-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider">Tendencia</p>
+          <div class="flex gap-1">
+            <button data-var="cintura"   class="med-var-btn px-3 py-1 rounded-lg text-xs font-600" style="background:#C8F135; color:#0D0D0D;">Cintura</button>
+            <button data-var="brazoRel"  class="med-var-btn px-3 py-1 rounded-lg text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">B.Rel</button>
+            <button data-var="brazoCont" class="med-var-btn px-3 py-1 rounded-lg text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">B.Cont</button>
+            <button data-var="muslo"     class="med-var-btn px-3 py-1 rounded-lg text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">Muslo</button>
+          </div>
+        </div>
+        <div style="position:relative; height:180px;">
+          <canvas id="med-chart"></canvas>
+          <div id="med-chart-empty" class="absolute inset-0 flex items-center justify-center">
+            <p class="text-muted text-sm text-center">Sin datos suficientes<br>para mostrar tendencia.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORIAL COMPLETO -->
+      <div>
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Historial completo</p>
+        <div id="med-historial" class="flex flex-col gap-2"></div>
+        <div id="med-historial-empty" class="hidden py-4 text-center">
+          <p class="text-muted text-sm">—</p>
+        </div>
+      </div>
+
     </div>
   </section>
 
