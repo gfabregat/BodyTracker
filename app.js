@@ -1571,7 +1571,14 @@ const dashPesoChartEmpty   = document.getElementById('dash-peso-chart-empty');
 const dashMediciones       = document.getElementById('dash-mediciones');
 const dashPRs              = document.getElementById('dash-prs');
 const dashFatiga           = document.getElementById('dash-fatiga');
+const dashNotasContainer   = document.getElementById('dash-notas-container');
+const dashNotasTexto       = document.getElementById('dash-notas-texto');
 const dashFotos            = document.getElementById('dash-fotos');
+const btnGenerarInforme    = document.getElementById('btn-generar-informe');
+const informeModal         = document.getElementById('informe-modal');
+const informeTexto         = document.getElementById('informe-texto');
+const btnInformeCerrar     = document.getElementById('btn-informe-cerrar');
+const btnInformeCopiar     = document.getElementById('btn-informe-copiar');
 
 let dashChart = null;
 let dashMesActivo = mesActual();
@@ -1730,6 +1737,15 @@ async function renderDashboard(mes) {
     dashFatiga.innerHTML = `<p class="text-muted text-sm">Sin fatiga registrada para este mes.</p>`;
   }
 
+  // ── Notas del check-in ───────────────────────────────
+  if (ciActual?.notas) {
+    dashNotasContainer.classList.remove('hidden');
+    dashNotasTexto.textContent = ciActual.notas;
+  } else {
+    dashNotasContainer.classList.add('hidden');
+    dashNotasTexto.textContent = '';
+  }
+
   // ── Fotos ─────────────────────────────────────────────
   const fotosActual   = await obtenerFotosPorMes(mes);
   const fotosAnterior = await obtenerFotosPorMes(mesAnt);
@@ -1828,6 +1844,177 @@ async function renderDashMiniChart(mes) {
     },
   });
 }
+
+// ─────────────────────────────────────────────────────────
+//  INFORME MARKDOWN
+// ─────────────────────────────────────────────────────────
+
+function signo(n) {
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+function flechaTexto(diff, umbral) {
+  if (Math.abs(diff) < umbral) return '→';
+  return diff > 0 ? '↑' : '↓';
+}
+
+async function generarInformeMarkdown(mes) {
+  const ajustes    = cargarAjustes();
+  const mesAnt     = mesAnterior(mes);
+  const nombreMes  = formatearMes(mes);
+  const hoyStr     = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const [
+    mediaActual, mediaAnterior,
+    medActual, medAnterior,
+    ciActual, ciAnterior,
+    fotosActual,
+  ] = await Promise.all([
+    mediaMovilHastaMes(mes),
+    mediaMovilHastaMes(mesAnt),
+    obtenerMedicionPorMes(mes),
+    obtenerMedicionPorMes(mesAnt),
+    obtenerCheckinPorMes(mes),
+    obtenerCheckinPorMes(mesAnt),
+    obtenerFotosPorMes(mes),
+  ]);
+
+  const lineas = [];
+
+  // ── Cabecera ──────────────────────────────────────────
+  lineas.push(`# INFORME DE CHECK-IN MENSUAL — ${nombreMes}`);
+  lineas.push(`**Generado:** ${hoyStr}`);
+  lineas.push(`**Objetivo del ciclo:** ${ajustes.objetivo === 'masa' ? 'Ganar masa' : ajustes.objetivo === 'definicion' ? 'Definición' : 'Mantenimiento'}`);
+  lineas.push('');
+
+  // ── Peso ──────────────────────────────────────────────
+  lineas.push('## PESO');
+  if (mediaActual !== null) {
+    lineas.push(`- **Media 7 días (este mes):** ${mediaActual.toFixed(1)} kg`);
+    if (mediaAnterior !== null) {
+      const diff = +(mediaActual - mediaAnterior).toFixed(1);
+      lineas.push(`- **Media 7 días (mes anterior):** ${mediaAnterior.toFixed(1)} kg`);
+      lineas.push(`- **Delta:** ${signo(diff)} kg ${flechaTexto(diff, 0.3)}`);
+    } else {
+      lineas.push(`- **Media 7 días (mes anterior):** Sin datos`);
+    }
+  } else {
+    lineas.push(`- Sin registros de peso para este mes.`);
+  }
+  lineas.push('');
+
+  // ── Mediciones ────────────────────────────────────────
+  lineas.push('## MEDICIONES');
+  if (medActual) {
+    const dCin  = medAnterior ? +(medActual.cintura       - medAnterior.cintura).toFixed(1)       : null;
+    const dBRel = medAnterior ? +(medActual.brazoRelajado - medAnterior.brazoRelajado).toFixed(1) : null;
+    const dBCon = medAnterior ? +(medActual.brazoCont     - medAnterior.brazoCont).toFixed(1)     : null;
+    const dMus  = (medActual.muslo !== null && medAnterior?.muslo !== null)
+      ? +(medActual.muslo - medAnterior.muslo).toFixed(1) : null;
+
+    lineas.push(`- **Cintura:**         ${medActual.cintura.toFixed(1)} cm${dCin  !== null ? `  (Δ ${signo(dCin)} cm ${flechaTexto(-dCin, 0.5)})` : ''}`);
+    lineas.push(`- **Brazo relajado:**  ${medActual.brazoRelajado.toFixed(1)} cm${dBRel !== null ? `  (Δ ${signo(dBRel)} cm ${flechaTexto(dBRel, 0.1)})` : ''}`);
+    lineas.push(`- **Brazo contraído:** ${medActual.brazoCont.toFixed(1)} cm${dBCon !== null ? `  (Δ ${signo(dBCon)} cm ${flechaTexto(dBCon, 0.1)})` : ''}`);
+    if (medActual.muslo !== null) {
+      lineas.push(`- **Muslo derecho:**   ${medActual.muslo.toFixed(1)} cm${dMus !== null ? `  (Δ ${signo(dMus)} cm ${flechaTexto(dMus, 0.1)})` : ''}`);
+    }
+  } else {
+    lineas.push(`- Sin mediciones registradas para este mes.`);
+  }
+  lineas.push('');
+
+  // ── PRs ───────────────────────────────────────────────
+  lineas.push('## MARCAS PERSONALES');
+  if (ciActual && (ciActual.banca !== null || ciActual.dominadas !== null || ciActual.rdl !== null)) {
+    const prLinea = (nombre, val, valAnt) => {
+      if (val === null) return null;
+      const diff = valAnt !== null ? +(val - valAnt).toFixed(1) : null;
+      return `- **${nombre}:** ${val} kg${diff !== null ? `  (Δ ${signo(diff)} kg ${flechaTexto(diff, 1)})` : ''}`;
+    };
+    const l1 = prLinea('Press de Banca', ciActual.banca,     ciAnterior?.banca     ?? null);
+    const l2 = prLinea('Dominadas',      ciActual.dominadas, ciAnterior?.dominadas ?? null);
+    const l3 = prLinea('RDL',            ciActual.rdl,       ciAnterior?.rdl       ?? null);
+    if (l1) lineas.push(l1);
+    if (l2) lineas.push(l2);
+    if (l3) lineas.push(l3);
+  } else {
+    lineas.push(`- Sin check-in registrado para este mes.`);
+  }
+  lineas.push('');
+
+  // ── Fatiga ────────────────────────────────────────────
+  lineas.push('## FATIGA SUBJETIVA');
+  if (ciActual?.fatiga !== null && ciActual?.fatiga !== undefined) {
+    lineas.push(`- **Este mes:**     ${ciActual.fatiga}/10`);
+    if (ciAnterior?.fatiga !== null && ciAnterior?.fatiga !== undefined) {
+      lineas.push(`- **Mes anterior:** ${ciAnterior.fatiga}/10`);
+    }
+  } else {
+    lineas.push(`- Sin dato de fatiga para este mes.`);
+  }
+  lineas.push('');
+
+  // ── Pasos ─────────────────────────────────────────────
+  if (ciActual?.pasos !== null && ciActual?.pasos !== undefined) {
+    lineas.push('## PASOS DIARIOS (media mensual)');
+    lineas.push(`- **Este mes:**     ${ciActual.pasos.toLocaleString('es-ES')} pasos/día`);
+    if (ciAnterior?.pasos !== null && ciAnterior?.pasos !== undefined) {
+      lineas.push(`- **Mes anterior:** ${ciAnterior.pasos.toLocaleString('es-ES')} pasos/día`);
+    }
+    lineas.push('');
+  }
+
+  // ── Fotos ─────────────────────────────────────────────
+  lineas.push('## FOTOS');
+  const posesConFoto = fotosActual ? POSES.filter(p => fotosActual[p]) : [];
+  if (posesConFoto.length > 0) {
+    lineas.push(`- Adjuntas: ${posesConFoto.map(p => POSES_LABELS[p]).join(', ')}`);
+  } else {
+    lineas.push(`- No adjuntas este mes.`);
+  }
+  lineas.push('');
+
+  // ── Notas ─────────────────────────────────────────────
+  if (ciActual?.notas) {
+    lineas.push('## NOTAS DEL MES');
+    lineas.push(ciActual.notas);
+    lineas.push('');
+  }
+
+  return lineas.join('\n');
+}
+
+// Event listeners del informe
+btnGenerarInforme.addEventListener('click', async () => {
+  const md = await generarInformeMarkdown(dashMesActivo);
+  informeTexto.textContent = md;
+  informeModal.style.display = 'flex';
+  informeModal.classList.remove('hidden');
+});
+
+btnInformeCerrar.addEventListener('click', () => {
+  informeModal.style.display = 'none';
+  informeModal.classList.add('hidden');
+});
+
+btnInformeCopiar.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(informeTexto.textContent);
+    btnInformeCopiar.textContent = '✓ Copiado';
+    btnInformeCopiar.style.background = '#8AAD20';
+    setTimeout(() => {
+      btnInformeCopiar.textContent = 'Copiar';
+      btnInformeCopiar.style.background = '#C8F135';
+    }, 2000);
+  } catch {
+    // Fallback para browsers que bloquean clipboard sin interacción
+    const range = document.createRange();
+    range.selectNode(informeTexto);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    mostrarToast('Seleccioná el texto y copiá manualmente', '#6B6B6B');
+  }
+});
 
 // ─────────────────────────────────────────────────────────
 //  AJUSTES

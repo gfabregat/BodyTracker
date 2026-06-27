@@ -614,10 +614,17 @@
         <p class="text-muted text-xs font-medium uppercase tracking-widest">Resumen</p>
         <h1 class="text-text text-xl font-700 leading-tight">Dashboard</h1>
       </div>
-      <select id="dash-mes-selector"
-        class="px-3 py-2 rounded-xl text-sm font-600"
-        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none; max-width:160px;">
-      </select>
+      <div class="flex items-center gap-2">
+        <button id="btn-generar-informe"
+          class="px-3 py-2 rounded-xl text-xs font-600 transition-all active:scale-95"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B; min-height:36px;">
+          📋 Informe
+        </button>
+        <select id="dash-mes-selector"
+          class="px-3 py-2 rounded-xl text-sm font-600"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none; max-width:145px;">
+        </select>
+      </div>
     </header>
 
     <!-- Contenido scrolleable -->
@@ -676,9 +683,17 @@
 
         <!-- BLOQUE: Fatiga -->
         <div class="mb-4">
-          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fatiga subjetiva</p>
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fatiga y actividad</p>
           <div id="dash-fatiga" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
             <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE: Notas del check-in -->
+        <div id="dash-notas-container" class="hidden mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Notas del mes</p>
+          <div class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p id="dash-notas-texto" class="text-sm" style="color:#F0F0F0; line-height:1.6; white-space:pre-wrap;"></p>
           </div>
         </div>
 
@@ -806,6 +821,41 @@
           Importar
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: informe markdown -->
+  <div id="informe-modal" class="hidden" style="
+    position:fixed; inset:0; z-index:3000;
+    background:#0D0D0D;
+    display:none; flex-direction:column;">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4" style="flex-shrink:0; border-bottom:1px solid #2A2A2A;">
+      <button id="btn-informe-cerrar"
+        style="background:transparent; border:none; color:#6B6B6B; font-size:18px; padding:4px 8px;">
+        ←
+      </button>
+      <p class="text-text text-sm font-600">Informe mensual</p>
+      <button id="btn-informe-copiar"
+        class="px-4 py-2 rounded-xl text-sm font-700 transition-all active:scale-95"
+        style="background:#C8F135; color:#0D0D0D; min-height:36px;">
+        Copiar
+      </button>
+    </div>
+
+    <!-- Texto del informe -->
+    <div class="flex-1 min-h-0 scroll-y px-5 py-4">
+      <pre id="informe-texto"
+        style="font-family:'Courier New', monospace; font-size:12px; line-height:1.7;
+               color:#F0F0F0; white-space:pre-wrap; word-break:break-word;
+               background:#1A1A1A; border:1px solid #2A2A2A;
+               border-radius:16px; padding:16px; margin:0;"></pre>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-5 py-4 text-center" style="flex-shrink:0; border-top:1px solid #2A2A2A;">
+      <p class="text-muted text-xs">Copiá el texto y pegalo en el chat con tu entrenador</p>
     </div>
   </div>
 
