@@ -354,3 +354,94 @@ async function verificarRecordatorios() {
 
   return mensajes;
 }
+
+// ─────────────────────────────────────────────────────────
+//  FOTOS DE PROGRESO
+// ─────────────────────────────────────────────────────────
+
+const POSES = ['frente', 'espalda', 'perfilD', 'perfilI'];
+const POSES_LABELS = { frente: 'Frente', espalda: 'Espalda', perfilD: 'Perfil D', perfilI: 'Perfil I' };
+
+/**
+ * Guarda (o actualiza) una foto individual de un mes.
+ * Carga el registro existente y actualiza solo la pose indicada.
+ * @param {string} mes   - YYYY-MM
+ * @param {string} pose  - 'frente' | 'espalda' | 'perfilD' | 'perfilI'
+ * @param {string} base64 - imagen en base64 (sin prefijo data:...)
+ */
+async function guardarFoto(mes, pose, base64) {
+  const existing = await db.Fotos_Progreso.get(mes) || { fecha: mes, frente: null, espalda: null, perfilD: null, perfilI: null };
+  existing[pose] = base64;
+  await db.Fotos_Progreso.put(existing);
+}
+
+/**
+ * Elimina una foto individual de un mes.
+ */
+async function eliminarFoto(mes, pose) {
+  const existing = await db.Fotos_Progreso.get(mes);
+  if (!existing) return;
+  existing[pose] = null;
+  // Si no quedan fotos en el mes, eliminar el registro entero
+  const hayAlguna = POSES.some(p => existing[p] !== null);
+  if (hayAlguna) {
+    await db.Fotos_Progreso.put(existing);
+  } else {
+    await db.Fotos_Progreso.delete(mes);
+  }
+}
+
+/**
+ * Obtiene el registro de fotos de un mes.
+ * @param {string} mes - YYYY-MM
+ */
+async function obtenerFotosPorMes(mes) {
+  return db.Fotos_Progreso.get(mes);
+}
+
+/**
+ * Obtiene todos los registros de fotos ordenados por fecha ascendente.
+ */
+async function obtenerTodasLasFotos() {
+  return db.Fotos_Progreso.orderBy('fecha').toArray();
+}
+
+/**
+ * Comprime una imagen antes de guardarla.
+ * Máx 1200px en lado mayor, JPEG calidad 0.85.
+ * @param {File} file
+ * @returns {Promise<string>} base64 sin prefijo
+ */
+function comprimirImagen(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width);
+            width = MAX;
+          } else {
+            width = Math.round((width * MAX) / height);
+            height = MAX;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        // Extraer base64 sin el prefijo "data:image/jpeg;base64,"
+        const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(dataURL.split(',')[1]);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

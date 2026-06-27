@@ -461,15 +461,129 @@
   </section>
 
   <!-- ═══════════════════════════════════════
-       PANTALLA: FOTOS (placeholder Fase 4)
+       PANTALLA: FOTOS DE PROGRESO
   ════════════════════════════════════════ -->
-  <section id="screen-fotos" class="screen flex-1 min-h-0 items-center justify-center">
-    <div class="text-center px-8">
-      <div class="text-4xl mb-4">📷</div>
-      <p class="text-text font-600 text-lg mb-2">Fotos de progreso</p>
-      <p class="text-muted text-sm">Disponible en Fase 4</p>
+  <section id="screen-fotos" class="screen flex-1 min-h-0 flex-col">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <div>
+        <p class="text-muted text-xs font-medium uppercase tracking-widest">Progreso visual</p>
+        <h1 class="text-text text-xl font-700 leading-tight">Fotos</h1>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-comparar-fotos"
+          class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+          style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A; min-height:40px;">
+          Comparar
+        </button>
+        <button id="btn-nueva-foto"
+          class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+          style="background:#C8F135; color:#0D0D0D; min-height:40px;">
+          + Foto
+        </button>
+      </div>
+    </header>
+
+    <!-- Vista galería -->
+    <div id="fotos-galeria-view" class="flex-1 min-h-0 scroll-y px-5 pb-4">
+      <div id="fotos-grid-empty" class="hidden flex flex-col items-center justify-center py-16">
+        <p class="text-muted text-sm text-center">Todavía no hay fotos registradas.<br>Tocá "+ Foto" para agregar la primera.</p>
+      </div>
+      <div id="fotos-grid" class="flex flex-col gap-4">
+        <!-- Tarjetas de meses generadas por JS -->
+      </div>
     </div>
+
+    <!-- Vista comparación (oculta por defecto) -->
+    <div id="fotos-comparar-view" class="hidden flex-1 min-h-0 flex-col">
+
+      <!-- Selectores de mes -->
+      <div class="flex gap-3 px-5 pt-2 pb-3" style="flex-shrink:0;">
+        <div class="flex-1">
+          <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Mes A</label>
+          <select id="comparar-mes-a" class="w-full px-3 py-2 rounded-xl text-sm font-600"
+            style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;"></select>
+        </div>
+        <div class="flex-1">
+          <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Mes B</label>
+          <select id="comparar-mes-b" class="w-full px-3 py-2 rounded-xl text-sm font-600"
+            style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;"></select>
+        </div>
+      </div>
+
+      <!-- Selector de pose -->
+      <div class="flex gap-2 px-5 pb-3" style="flex-shrink:0; overflow-x:auto;">
+        <button data-pose="frente"   class="foto-pose-btn flex-shrink-0 px-4 py-2 rounded-xl text-xs font-600" style="background:#C8F135; color:#0D0D0D;">Frente</button>
+        <button data-pose="espalda"  class="foto-pose-btn flex-shrink-0 px-4 py-2 rounded-xl text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">Espalda</button>
+        <button data-pose="perfilD"  class="foto-pose-btn flex-shrink-0 px-4 py-2 rounded-xl text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">Perfil D</button>
+        <button data-pose="perfilI"  class="foto-pose-btn flex-shrink-0 px-4 py-2 rounded-xl text-xs font-600" style="background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;">Perfil I</button>
+      </div>
+
+      <!-- Imágenes comparadas -->
+      <div id="comparar-imagenes" class="flex-1 min-h-0 scroll-y px-5 pb-4">
+        <div class="grid gap-3" style="grid-template-columns:1fr 1fr;">
+          <div>
+            <p id="comparar-label-a" class="text-muted text-xs font-500 uppercase tracking-wider mb-2 text-center"></p>
+            <div id="comparar-img-a" class="rounded-2xl overflow-hidden flex items-center justify-center"
+              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:3/4;">
+            </div>
+          </div>
+          <div>
+            <p id="comparar-label-b" class="text-muted text-xs font-500 uppercase tracking-wider mb-2 text-center"></p>
+            <div id="comparar-img-b" class="rounded-2xl overflow-hidden flex items-center justify-center"
+              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:3/4;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón cerrar comparación -->
+      <div class="px-5 pb-4" style="flex-shrink:0;">
+        <button id="btn-cerrar-comparar"
+          class="w-full py-3 rounded-xl text-sm font-600 transition-all active:scale-95"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B;">
+          ← Volver a la galería
+        </button>
+      </div>
+    </div>
+
+    <!-- Input file oculto -->
+    <input type="file" id="foto-file-input" accept="image/*" capture="environment" class="hidden" />
+
   </section>
+
+  <!-- Modal: seleccionar pose para subir -->
+  <div id="foto-pose-modal" class="hidden" style="
+    position:fixed; inset:0; z-index:1000;
+    background:rgba(0,0,0,0.85);
+    display:none; align-items:flex-end; justify-content:center;">
+    <div class="w-full rounded-t-3xl p-6" style="background:#1A1A1A; border-top:1px solid #2A2A2A; max-width:480px;">
+      <p class="text-text font-600 text-base mb-1">¿Qué pose es esta foto?</p>
+      <p id="foto-modal-mes" class="text-muted text-xs mb-5"></p>
+      <div class="flex flex-col gap-3">
+        <button data-pose="frente"  class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Frente</button>
+        <button data-pose="espalda" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Espalda</button>
+        <button data-pose="perfilD" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Derecho</button>
+        <button data-pose="perfilI" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Izquierdo</button>
+        <button id="foto-pose-cancelar" class="w-full py-3 rounded-2xl text-sm font-600" style="background:transparent; color:#6B6B6B;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: expandir foto -->
+  <div id="foto-expand-modal" class="hidden" style="
+    position:fixed; inset:0; z-index:1000;
+    background:rgba(0,0,0,0.95);
+    display:none; align-items:center; justify-content:center; flex-direction:column;">
+    <button id="foto-expand-cerrar" style="
+      position:absolute; top:20px; right:20px;
+      background:#1A1A1A; border:1px solid #2A2A2A;
+      color:#F0F0F0; border-radius:50%; width:40px; height:40px;
+      font-size:20px; display:flex; align-items:center; justify-content:center;">✕</button>
+    <img id="foto-expand-img" src="" alt="" style="max-width:95vw; max-height:85vh; object-fit:contain; border-radius:12px;" />
+    <p id="foto-expand-label" class="text-muted text-xs mt-3"></p>
+  </div>
 
   <!-- ═══════════════════════════════════════
        PANTALLA: DASHBOARD (placeholder Fase 5)

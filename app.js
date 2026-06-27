@@ -47,6 +47,11 @@ function navegarA(tab) {
     initCheckinScreen();
   }
 
+  // Si vamos a fotos, refrescar
+  if (tab === 'fotos') {
+    initFotosScreen();
+  }
+
   // Si vamos a dashboard, quitar badge
   if (tab === 'dashboard') {
     ocultarDashboardBadge();
@@ -1094,6 +1099,359 @@ btnCiGuardar.addEventListener('click', async () => {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2000);
 });
+
+// ─────────────────────────────────────────────────────────
+//  PANTALLA DE FOTOS
+// ─────────────────────────────────────────────────────────
+
+const fotosGaleriaView   = document.getElementById('fotos-galeria-view');
+const fotosCompararView  = document.getElementById('fotos-comparar-view');
+const fotosGrid          = document.getElementById('fotos-grid');
+const fotosGridEmpty     = document.getElementById('fotos-grid-empty');
+const btnNuevaFoto       = document.getElementById('btn-nueva-foto');
+const btnCompararFotos   = document.getElementById('btn-comparar-fotos');
+const btnCerrarComparar  = document.getElementById('btn-cerrar-comparar');
+const fotoFileInput      = document.getElementById('foto-file-input');
+const fotoPoseModal      = document.getElementById('foto-pose-modal');
+const fotoModalMes       = document.getElementById('foto-modal-mes');
+const fotoPoseCancelar   = document.getElementById('foto-pose-cancelar');
+const fotoExpandModal    = document.getElementById('foto-expand-modal');
+const fotoExpandImg      = document.getElementById('foto-expand-img');
+const fotoExpandLabel    = document.getElementById('foto-expand-label');
+const fotoExpandCerrar   = document.getElementById('foto-expand-cerrar');
+const compararMesA       = document.getElementById('comparar-mes-a');
+const compararMesB       = document.getElementById('comparar-mes-b');
+const compararImgA       = document.getElementById('comparar-img-a');
+const compararImgB       = document.getElementById('comparar-img-b');
+const compararLabelA     = document.getElementById('comparar-label-a');
+const compararLabelB     = document.getElementById('comparar-label-b');
+const fotoPoseBtns       = document.querySelectorAll('.foto-pose-btn');
+
+let fotoPoseSeleccionada  = null; // pose elegida en el modal
+let fotoMesSubida         = null; // mes al que pertenece la foto que se sube
+let fotoArchivoTemporal   = null; // File object antes de elegir pose
+let comparadorPoseActual  = 'frente';
+
+// ── Inicialización ──────────────────────────────────────
+
+async function initFotosScreen() {
+  await renderGaleriaFotos();
+  mostrarVistaGaleria();
+}
+
+// ── Vista galería ───────────────────────────────────────
+
+async function renderGaleriaFotos() {
+  const todas = await obtenerTodasLasFotos();
+
+  if (!todas.length) {
+    fotosGridEmpty.classList.remove('hidden');
+    fotosGrid.innerHTML = '';
+    return;
+  }
+  fotosGridEmpty.classList.add('hidden');
+
+  // Ordenar descendente (más reciente primero)
+  const invertidas = [...todas].reverse();
+
+  fotosGrid.innerHTML = invertidas.map(reg => {
+    // Thumbnail: primera pose disponible
+    const thumbPose = POSES.find(p => reg[p]);
+    const thumbSrc  = thumbPose ? `data:image/jpeg;base64,${reg[thumbPose]}` : null;
+    const mesLabel  = formatearMes(reg.fecha);
+
+    const posesHTML = POSES.map(pose => {
+      const tieneFoto = !!reg[pose];
+      return `
+        <div class="relative" style="aspect-ratio:3/4;">
+          ${tieneFoto
+            ? `<img src="data:image/jpeg;base64,${reg[pose]}"
+                 alt="${POSES_LABELS[pose]}"
+                 class="foto-thumb-tap w-full h-full rounded-xl object-cover cursor-pointer"
+                 data-mes="${reg.fecha}" data-pose="${pose}"
+                 style="display:block;" />`
+            : `<div class="w-full h-full rounded-xl flex items-center justify-center"
+                 style="background:#1A1A1A; border:1px dashed #2A2A2A;">
+                 <button class="foto-agregar-btn flex flex-col items-center gap-1"
+                   data-mes="${reg.fecha}" data-pose="${pose}"
+                   style="background:transparent; border:none; color:#6B6B6B;">
+                   <span style="font-size:20px;">+</span>
+                   <span style="font-size:10px;">${POSES_LABELS[pose]}</span>
+                 </button>
+               </div>`
+          }
+          ${tieneFoto
+            ? `<button class="foto-eliminar-btn absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                 data-mes="${reg.fecha}" data-pose="${pose}"
+                 style="background:rgba(0,0,0,0.7); border:none; color:#F0F0F0; font-size:12px; line-height:1;">✕</button>`
+            : ''}
+          <p class="text-center text-muted mt-1" style="font-size:10px;">${POSES_LABELS[pose]}</p>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="rounded-2xl overflow-hidden" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+        <!-- Header del mes -->
+        <div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid #2A2A2A;">
+          <span class="text-text font-600 text-sm">${mesLabel}</span>
+          ${thumbPose
+            ? `<span class="text-muted text-xs">${POSES.filter(p => reg[p]).length}/4 poses</span>`
+            : ''}
+        </div>
+        <!-- Grid de 4 poses -->
+        <div class="grid gap-2 p-3" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+          ${posesHTML}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Listeners: expandir foto al tocar
+  document.querySelectorAll('.foto-thumb-tap').forEach(img => {
+    img.addEventListener('click', () => {
+      abrirExpandModal(img.dataset.mes, img.dataset.pose);
+    });
+  });
+
+  // Listeners: agregar foto a pose vacía
+  document.querySelectorAll('.foto-agregar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      iniciarSubidaFoto(btn.dataset.mes, btn.dataset.pose);
+    });
+  });
+
+  // Listeners: eliminar foto
+  document.querySelectorAll('.foto-eliminar-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await eliminarFoto(btn.dataset.mes, btn.dataset.pose);
+      await renderGaleriaFotos();
+    });
+  });
+}
+
+// ── Modal expandir foto ─────────────────────────────────
+
+function abrirExpandModal(mes, pose) {
+  fotoExpandModal.style.display = 'flex';
+  fotoExpandModal.classList.remove('hidden');
+  fotoExpandLabel.textContent = `${formatearMes(mes)} — ${POSES_LABELS[pose]}`;
+  // La imagen ya estaba cargada en el DOM como base64
+  const imgEl = document.querySelector(`.foto-thumb-tap[data-mes="${mes}"][data-pose="${pose}"]`);
+  if (imgEl) fotoExpandImg.src = imgEl.src;
+}
+
+fotoExpandCerrar.addEventListener('click', () => {
+  fotoExpandModal.style.display = 'none';
+  fotoExpandModal.classList.add('hidden');
+  fotoExpandImg.src = '';
+});
+
+fotoExpandModal.addEventListener('click', (e) => {
+  if (e.target === fotoExpandModal) {
+    fotoExpandModal.style.display = 'none';
+    fotoExpandModal.classList.add('hidden');
+    fotoExpandImg.src = '';
+  }
+});
+
+// ── Subida de foto ──────────────────────────────────────
+
+/**
+ * Inicia el flujo de subida de foto.
+ * Si se pasa pose, la usa directamente (desde botón de pose vacía).
+ * Si no se pasa pose, abre el modal de selección.
+ */
+function iniciarSubidaFoto(mes, poseDirecta = null) {
+  fotoMesSubida = mes || mesActual();
+  fotoPoseSeleccionada = poseDirecta;
+
+  if (poseDirecta) {
+    // Ir directo al selector de archivo
+    fotoFileInput.click();
+  } else {
+    // Abrir modal de selección de pose primero
+    fotoModalMes.textContent = formatearMes(fotoMesSubida);
+    fotoPoseModal.style.display = 'flex';
+    fotoPoseModal.classList.remove('hidden');
+  }
+}
+
+// Botón "+ Foto" del header
+btnNuevaFoto.addEventListener('click', () => {
+  iniciarSubidaFoto(mesActual(), null);
+});
+
+// Cancelar modal de pose
+fotoPoseCancelar.addEventListener('click', () => {
+  fotoPoseModal.style.display = 'none';
+  fotoPoseModal.classList.add('hidden');
+  fotoMesSubida = null;
+  fotoPoseSeleccionada = null;
+});
+
+// Seleccionar pose en el modal
+document.querySelectorAll('.foto-pose-select').forEach(btn => {
+  btn.addEventListener('click', () => {
+    fotoPoseSeleccionada = btn.dataset.pose;
+    fotoPoseModal.style.display = 'none';
+    fotoPoseModal.classList.add('hidden');
+    fotoFileInput.click();
+  });
+});
+
+// Procesar archivo seleccionado
+fotoFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  fotoFileInput.value = ''; // Reset para permitir subir el mismo archivo de nuevo
+
+  if (!file || !fotoPoseSeleccionada || !fotoMesSubida) return;
+
+  // Toast de cargando
+  const toastCargando = document.createElement('div');
+  toastCargando.textContent = '⏳ Comprimiendo imagen...';
+  toastCargando.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;
+    padding:10px 20px; border-radius:999px; font-size:13px;
+    z-index:9999; white-space:nowrap;`;
+  document.body.appendChild(toastCargando);
+
+  try {
+    const base64 = await comprimirImagen(file);
+    await guardarFoto(fotoMesSubida, fotoPoseSeleccionada, base64);
+    toastCargando.remove();
+
+    await renderGaleriaFotos();
+
+    const toast = document.createElement('div');
+    toast.textContent = '✓ Foto guardada';
+    toast.style.cssText = `
+      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+      background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
+      padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
+      z-index:9999; white-space:nowrap;`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  } catch (err) {
+    toastCargando.remove();
+    console.error('[Fotos] Error al comprimir:', err);
+    const toast = document.createElement('div');
+    toast.textContent = '✗ Error al guardar la foto';
+    toast.style.cssText = `
+      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+      background:#1A1A1A; color:#FF4D4D; border:1px solid #FF4D4D;
+      padding:10px 20px; border-radius:999px; font-size:13px;
+      z-index:9999; white-space:nowrap;`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  fotoMesSubida = null;
+  fotoPoseSeleccionada = null;
+});
+
+// ── Vista comparación ───────────────────────────────────
+
+function mostrarVistaGaleria() {
+  fotosGaleriaView.classList.remove('hidden');
+  fotosCompararView.classList.add('hidden');
+  fotosCompararView.style.display = 'none';
+  fotosGaleriaView.style.display = 'block';
+  btnCompararFotos.style.color = '#6B6B6B';
+  btnCompararFotos.style.borderColor = '#2A2A2A';
+}
+
+async function mostrarVistaComparar() {
+  fotosGaleriaView.classList.add('hidden');
+  fotosGaleriaView.style.display = 'none';
+  fotosCompararView.classList.remove('hidden');
+  fotosCompararView.style.display = 'flex';
+  btnCompararFotos.style.color = '#C8F135';
+  btnCompararFotos.style.borderColor = '#C8F135';
+
+  await inicializarComparador();
+}
+
+async function inicializarComparador() {
+  const todas = await obtenerTodasLasFotos();
+
+  if (!todas.length) {
+    compararImgA.innerHTML = `<p class="text-muted text-sm text-center p-4">Sin fotos registradas</p>`;
+    compararImgB.innerHTML = `<p class="text-muted text-sm text-center p-4">Sin fotos registradas</p>`;
+    return;
+  }
+
+  // Poblar selectores
+  const options = todas.map(r =>
+    `<option value="${r.fecha}">${formatearMes(r.fecha)}</option>`
+  ).join('');
+  compararMesA.innerHTML = options;
+  compararMesB.innerHTML = options;
+
+  // Por defecto: A = mes más reciente, B = penúltimo (si existe)
+  compararMesA.value = todas[todas.length - 1].fecha;
+  compararMesB.value = todas.length >= 2 ? todas[todas.length - 2].fecha : todas[0].fecha;
+
+  await renderComparacion();
+}
+
+async function renderComparacion() {
+  const mesA = compararMesA.value;
+  const mesB = compararMesB.value;
+  const pose = comparadorPoseActual;
+
+  const regA = await obtenerFotosPorMes(mesA);
+  const regB = await obtenerFotosPorMes(mesB);
+
+  compararLabelA.textContent = formatearMes(mesA);
+  compararLabelB.textContent = formatearMes(mesB);
+
+  const renderSlot = (reg, mes) => {
+    if (reg && reg[pose]) {
+      return `<img src="data:image/jpeg;base64,${reg[pose]}"
+        alt="${POSES_LABELS[pose]}"
+        style="width:100%; height:100%; object-fit:cover; display:block;" />`;
+    }
+    return `<div class="flex flex-col items-center justify-center gap-2 p-4" style="height:100%;">
+      <p class="text-muted text-xs text-center">Sin foto</p>
+      <button class="comp-agregar-btn px-3 py-2 rounded-xl text-xs font-600"
+        data-mes="${mes}" data-pose="${pose}"
+        style="background:#2A2A2A; color:#6B6B6B; border:none;">+ Agregar</button>
+    </div>`;
+  };
+
+  compararImgA.innerHTML = renderSlot(regA, mesA);
+  compararImgB.innerHTML = renderSlot(regB, mesB);
+
+  // Listeners botones agregar desde comparador
+  document.querySelectorAll('.comp-agregar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      iniciarSubidaFoto(btn.dataset.mes, btn.dataset.pose);
+    });
+  });
+}
+
+// Cambios en selectores y pose del comparador
+compararMesA.addEventListener('change', renderComparacion);
+compararMesB.addEventListener('change', renderComparacion);
+
+fotoPoseBtns.forEach(btn => {
+  btn.addEventListener('click', async () => {
+    comparadorPoseActual = btn.dataset.pose;
+    fotoPoseBtns.forEach(b => {
+      b.style.background = '#1A1A1A';
+      b.style.color = '#6B6B6B';
+      b.style.border = '1px solid #2A2A2A';
+    });
+    btn.style.background = '#C8F135';
+    btn.style.color = '#0D0D0D';
+    btn.style.border = 'none';
+    await renderComparacion();
+  });
+});
+
+btnCompararFotos.addEventListener('click', mostrarVistaComparar);
+btnCerrarComparar.addEventListener('click', mostrarVistaGaleria);
 
 // ─────────────────────────────────────────────────────────
 //  AJUSTES (placeholder — Fase 5)
