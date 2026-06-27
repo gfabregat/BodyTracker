@@ -113,6 +113,14 @@
 
     /* Scrollbar invisible */
     ::-webkit-scrollbar { width: 0; }
+
+    /* Cropper overrides — fondo oscuro */
+    .cropper-container { max-height: 60vh !important; }
+    .cropper-bg { background-image: none; background-color: #0D0D0D; }
+    .cropper-modal { background: #0D0D0D; opacity: 0.8; }
+    .cropper-view-box { outline-color: #C8F135; }
+    .cropper-line, .cropper-point { background-color: #C8F135; }
+    .cropper-point { width: 10px; height: 10px; opacity: 1; }
   </style>
 </head>
 <body>
@@ -652,9 +660,47 @@
   </nav>
 </div>
 
-<!-- ═══════════════════════════════════════
-     SCRIPTS — orden de carga importante
-════════════════════════════════════════ -->
+<!-- Modal: recortar foto -->
+<div id="foto-crop-modal" class="hidden" style="
+  position:fixed; inset:0; z-index:2000;
+  background:#0D0D0D;
+  display:none; flex-direction:column;">
+
+  <!-- Header del crop -->
+  <div class="flex items-center justify-between px-5 py-4" style="flex-shrink:0; border-bottom:1px solid #2A2A2A;">
+    <button id="btn-crop-cancelar" class="text-sm font-600" style="background:transparent; border:none; color:#6B6B6B;">
+      Cancelar
+    </button>
+    <p class="text-text text-sm font-600">Recortar foto</p>
+    <button id="btn-crop-confirmar" class="text-sm font-700" style="background:transparent; border:none; color:#C8F135;">
+      Guardar
+    </button>
+  </div>
+
+  <!-- Área de crop -->
+  <div class="flex-1 min-h-0 flex items-center justify-center" style="overflow:hidden; background:#0D0D0D;">
+    <img id="crop-imagen" src="" alt="Recortar" style="max-width:100%; display:block;" />
+  </div>
+
+  <!-- Controles -->
+  <div class="px-5 py-4 text-center" style="flex-shrink:0; border-top:1px solid #2A2A2A;">
+    <p class="text-muted text-xs mb-3">Arrastrá para mover · Pellizcá para ajustar el área</p>
+    <div class="flex justify-center gap-3">
+      <button id="btn-crop-rotar" class="px-4 py-2 rounded-xl text-xs font-600"
+        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B;">
+        ↺ Rotar 90°
+      </button>
+      <button id="btn-crop-reset" class="px-4 py-2 rounded-xl text-xs font-600"
+        style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B;">
+        ⟳ Resetear
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 
 <!-- Dexie.js -->
 <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>

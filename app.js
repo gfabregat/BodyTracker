@@ -1299,29 +1299,95 @@ document.querySelectorAll('.foto-pose-select').forEach(btn => {
   });
 });
 
-// Procesar archivo seleccionado
-fotoFileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  fotoFileInput.value = ''; // Reset para permitir subir el mismo archivo de nuevo
+// ── Modal de crop ───────────────────────────────────────
 
-  if (!file || !fotoPoseSeleccionada || !fotoMesSubida) return;
+const fotoCropModal    = document.getElementById('foto-crop-modal');
+const cropImagen       = document.getElementById('crop-imagen');
+const btnCropCancelar  = document.getElementById('btn-crop-cancelar');
+const btnCropConfirmar = document.getElementById('btn-crop-confirmar');
+const btnCropRotar     = document.getElementById('btn-crop-rotar');
+const btnCropReset     = document.getElementById('btn-crop-reset');
 
-  // Toast de cargando
-  const toastCargando = document.createElement('div');
-  toastCargando.textContent = '⏳ Comprimiendo imagen...';
-  toastCargando.style.cssText = `
-    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-    background:#1A1A1A; color:#6B6B6B; border:1px solid #2A2A2A;
-    padding:10px 20px; border-radius:999px; font-size:13px;
-    z-index:9999; white-space:nowrap;`;
-  document.body.appendChild(toastCargando);
+let cropperInstance = null;
+
+function abrirCropModal(imageSrc) {
+  cropImagen.src = imageSrc;
+  fotoCropModal.style.display = 'flex';
+  fotoCropModal.classList.remove('hidden');
+
+  // Inicializar cropper después de que la imagen cargue
+  cropImagen.onload = () => {
+    if (cropperInstance) {
+      cropperInstance.destroy();
+      cropperInstance = null;
+    }
+    cropperInstance = new Cropper(cropImagen, {
+      viewMode: 1,        // La imagen no puede salir del contenedor
+      autoCropArea: 0.9,  // Área de crop inicial: 90% de la imagen
+      aspectRatio: NaN,   // Libre
+      movable: true,
+      zoomable: true,
+      rotatable: true,
+      scalable: false,
+      responsive: true,
+      checkOrientation: true,
+      guides: true,
+      center: true,
+      highlight: false,
+      background: true,
+      modal: true,
+    });
+  };
+}
+
+function cerrarCropModal() {
+  if (cropperInstance) {
+    cropperInstance.destroy();
+    cropperInstance = null;
+  }
+  fotoCropModal.style.display = 'none';
+  fotoCropModal.classList.add('hidden');
+  cropImagen.src = '';
+  fotoMesSubida = null;
+  fotoPoseSeleccionada = null;
+}
+
+btnCropCancelar.addEventListener('click', cerrarCropModal);
+
+btnCropRotar.addEventListener('click', () => {
+  if (cropperInstance) cropperInstance.rotate(90);
+});
+
+btnCropReset.addEventListener('click', () => {
+  if (cropperInstance) cropperInstance.reset();
+});
+
+btnCropConfirmar.addEventListener('click', async () => {
+  if (!cropperInstance || !fotoPoseSeleccionada || !fotoMesSubida) return;
+
+  // Deshabilitar botón mientras procesa
+  btnCropConfirmar.textContent = '...';
+  btnCropConfirmar.style.opacity = '0.5';
 
   try {
-    const base64 = await comprimirImagen(file);
-    await guardarFoto(fotoMesSubida, fotoPoseSeleccionada, base64);
-    toastCargando.remove();
+    // Obtener canvas recortado y comprimido
+    const canvas = cropperInstance.getCroppedCanvas({
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+    });
 
+    const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    await guardarFoto(fotoMesSubida, fotoPoseSeleccionada, base64);
+
+    cerrarCropModal();
     await renderGaleriaFotos();
+
+    // Si estamos en modo comparación, refrescar
+    if (fotosCompararView.style.display !== 'none') {
+      await renderComparacion();
+    }
 
     const toast = document.createElement('div');
     toast.textContent = '✓ Foto guardada';
@@ -1333,10 +1399,27 @@ fotoFileInput.addEventListener('change', async (e) => {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 2000);
   } catch (err) {
-    toastCargando.remove();
-    console.error('[Fotos] Error al comprimir:', err);
+    console.error('[Crop] Error:', err);
+    btnCropConfirmar.textContent = 'Guardar';
+    btnCropConfirmar.style.opacity = '1';
+  }
+});
+
+// Procesar archivo seleccionado — ahora abre el crop en lugar de guardar directo
+fotoFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  fotoFileInput.value = '';
+
+  if (!file || !fotoPoseSeleccionada || !fotoMesSubida) return;
+
+  // Leer el archivo como Data URL para pasarlo al cropper
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    abrirCropModal(ev.target.result);
+  };
+  reader.onerror = () => {
     const toast = document.createElement('div');
-    toast.textContent = '✗ Error al guardar la foto';
+    toast.textContent = '✗ Error al leer la imagen';
     toast.style.cssText = `
       position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
       background:#1A1A1A; color:#FF4D4D; border:1px solid #FF4D4D;
@@ -1344,10 +1427,8 @@ fotoFileInput.addEventListener('change', async (e) => {
       z-index:9999; white-space:nowrap;`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
-  }
-
-  fotoMesSubida = null;
-  fotoPoseSeleccionada = null;
+  };
+  reader.readAsDataURL(file);
 });
 
 // ── Vista comparación ───────────────────────────────────
