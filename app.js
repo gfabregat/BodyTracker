@@ -41,6 +41,16 @@ function navegarA(tab) {
   if (tab === 'mediciones') {
     initMedicionesScreen();
   }
+
+  // Si vamos a check-in, refrescar
+  if (tab === 'checkin') {
+    initCheckinScreen();
+  }
+
+  // Si vamos a dashboard, quitar badge
+  if (tab === 'dashboard') {
+    ocultarDashboardBadge();
+  }
 }
 
 navItems.forEach(item => {
@@ -770,6 +780,317 @@ btnMedGuardar.addEventListener('click', async () => {
     background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
     padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
     z-index:9999; white-space:nowrap; pointer-events:none;`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+});
+
+// ─────────────────────────────────────────────────────────
+//  PANTALLA DE CHECK-IN
+// ─────────────────────────────────────────────────────────
+
+const ciMesLabel          = document.getElementById('ci-mes-label');
+const ciBanner            = document.getElementById('ci-banner');
+const ciBannerTexto       = document.getElementById('ci-banner-texto');
+const ciFormContainer     = document.getElementById('ci-form-container');
+const ciFormTitulo        = document.getElementById('ci-form-titulo');
+const ciResumenContainer  = document.getElementById('ci-resumen-container');
+const ciResumen           = document.getElementById('ci-resumen');
+const ciHistorial         = document.getElementById('ci-historial');
+const ciHistorialEmpty    = document.getElementById('ci-historial-empty');
+const btnNuevoCheckin     = document.getElementById('btn-nuevo-checkin');
+const btnCiGuardar        = document.getElementById('btn-ci-guardar');
+const btnCiCancelar       = document.getElementById('btn-ci-cancelar');
+const inputCiBanca        = document.getElementById('ci-banca');
+const inputCiDominadas    = document.getElementById('ci-dominadas');
+const inputCiRdl          = document.getElementById('ci-rdl');
+const inputCiFatiga       = document.getElementById('ci-fatiga');
+const inputCiFatigaActiva = document.getElementById('ci-fatiga-activa');
+const ciFatigaValor       = document.getElementById('ci-fatiga-valor');
+const inputCiNotas        = document.getElementById('ci-notas');
+const dashboardBadge      = document.getElementById('dashboard-badge');
+
+let ciEditandoMes = null;
+
+// Badge de dashboard
+function mostrarDashboardBadge() {
+  dashboardBadge.classList.remove('hidden');
+}
+function ocultarDashboardBadge() {
+  dashboardBadge.classList.add('hidden');
+}
+
+// Slider de fatiga — actualizar valor en tiempo real
+inputCiFatiga.addEventListener('input', () => {
+  ciFatigaValor.textContent = inputCiFatiga.value;
+});
+inputCiFatigaActiva.addEventListener('change', () => {
+  inputCiFatiga.disabled = !inputCiFatigaActiva.checked;
+  ciFatigaValor.style.color = inputCiFatigaActiva.checked ? '#C8F135' : '#6B6B6B';
+});
+
+async function initCheckinScreen() {
+  ciMesLabel.textContent = formatearMes(mesActual());
+
+  // Recordatorios
+  const mensajes = await verificarRecordatorios();
+  if (mensajes.length > 0) {
+    ciBannerTexto.textContent = mensajes[0];
+    ciBanner.classList.remove('hidden');
+  } else {
+    ciBanner.classList.add('hidden');
+  }
+
+  await renderCheckinUI();
+}
+
+async function renderCheckinUI() {
+  const todos = await obtenerTodosLosCheckins(); // ASC
+  const checkinMesActual = await obtenerCheckinPorMes(mesActual());
+
+  // Botón header
+  btnNuevoCheckin.textContent = checkinMesActual ? '✎ Editar' : '+ Nuevo';
+
+  // Resumen mes actual
+  if (checkinMesActual) {
+    ciResumenContainer.classList.remove('hidden');
+    renderResumenCheckin(checkinMesActual, todos);
+  } else {
+    ciResumenContainer.classList.add('hidden');
+  }
+
+  // Historial (todos excepto el mes actual, invertido)
+  const historial = todos.filter(c => c.fecha !== mesActual()).reverse();
+  renderHistorialCheckin(historial, todos);
+}
+
+function renderResumenCheckin(reg, todos) {
+  // Buscar el anterior para deltas
+  const idx = todos.findIndex(c => c.fecha === reg.fecha);
+  const anterior = idx > 0 ? todos[idx - 1] : null;
+
+  const dBanca     = calcularDeltaPR(anterior?.banca,     reg.banca);
+  const dDominadas = calcularDeltaPR(anterior?.dominadas, reg.dominadas);
+  const dRdl       = calcularDeltaPR(anterior?.rdl,       reg.rdl);
+  const dFatiga    = calcularDeltaFatiga(anterior?.fatiga, reg.fatiga);
+
+  ciResumen.innerHTML = `
+    <div class="grid gap-2 mb-3" style="grid-template-columns:1fr 1fr 1fr;">
+      ${renderPRCard('Banca', reg.banca, dBanca)}
+      ${renderPRCard('Dominadas', reg.dominadas, dDominadas)}
+      ${renderPRCard('RDL', reg.rdl, dRdl)}
+    </div>
+    ${reg.fatiga !== null ? `
+    <div class="rounded-xl p-3 mb-3" style="background:#0D0D0D;">
+      <p class="text-muted text-xs mb-1">Fatiga</p>
+      <div class="flex items-center gap-2">
+        <span class="text-text font-700 text-lg">${reg.fatiga}</span>
+        <span class="text-muted text-xs">/10</span>
+        <span class="text-xs ml-auto">${renderDeltaFlecha(dFatiga, '')}</span>
+      </div>
+      ${renderBarraFatiga(reg.fatiga)}
+    </div>` : ''}
+    ${reg.notas ? `
+    <div class="rounded-xl p-3" style="background:#0D0D0D;">
+      <p class="text-muted text-xs mb-1">Notas</p>
+      <p class="text-sm" style="color:#F0F0F0; line-height:1.5; white-space:pre-wrap;">${escapeHTML(reg.notas)}</p>
+    </div>` : ''}
+  `;
+}
+
+function renderPRCard(nombre, valor, delta) {
+  const valorStr = valor !== null ? `${valor} <span style="color:#6B6B6B;font-size:11px;font-weight:400;">kg</span>` : '<span style="color:#6B6B6B">—</span>';
+  return `
+    <div class="rounded-xl p-3" style="background:#0D0D0D;">
+      <p class="text-muted text-xs mb-1">${nombre}</p>
+      <p class="font-700" style="font-size:15px;">${valorStr}</p>
+      <p class="text-xs mt-1">${renderDeltaFlecha(delta, 'kg')}</p>
+    </div>`;
+}
+
+function renderBarraFatiga(valor) {
+  const pct = ((valor - 1) / 9) * 100;
+  const color = valor <= 3 ? '#C8F135' : valor <= 6 ? '#FFB347' : '#FF4D4D';
+  return `
+    <div style="height:4px; background:#2A2A2A; border-radius:2px; margin-top:8px;">
+      <div style="height:100%; width:${pct}%; background:${color}; border-radius:2px; transition:width 0.3s;"></div>
+    </div>`;
+}
+
+function renderHistorialCheckin(historial, todos) {
+  if (!historial.length) {
+    ciHistorialEmpty.classList.remove('hidden');
+    ciHistorial.innerHTML = '';
+    return;
+  }
+  ciHistorialEmpty.classList.add('hidden');
+
+  ciHistorial.innerHTML = historial.map(reg => {
+    const idx = todos.findIndex(c => c.fecha === reg.fecha);
+    const anterior = idx > 0 ? todos[idx - 1] : null;
+
+    const dBanca     = calcularDeltaPR(anterior?.banca,     reg.banca);
+    const dDominadas = calcularDeltaPR(anterior?.dominadas, reg.dominadas);
+    const dRdl       = calcularDeltaPR(anterior?.rdl,       reg.rdl);
+    const dFatiga    = calcularDeltaFatiga(anterior?.fatiga, reg.fatiga);
+
+    const notasId = `notas-${reg.fecha}`;
+
+    return `
+      <div class="rounded-2xl" style="background:#1A1A1A; border:1px solid #2A2A2A; overflow:hidden;">
+        <!-- Header de tarjeta -->
+        <div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid #2A2A2A;">
+          <span class="text-text font-600 text-sm">${formatearMes(reg.fecha)}</span>
+          <div class="flex gap-2">
+            ${reg.notas ? `<button class="ci-toggle-notas text-xs px-3 py-1 rounded-lg" data-target="${notasId}"
+              style="background:#2A2A2A; color:#6B6B6B;">Ver notas</button>` : ''}
+            <button class="ci-editar-btn text-xs px-3 py-1 rounded-lg"
+              data-mes="${reg.fecha}"
+              style="background:#2A2A2A; color:#6B6B6B;">Editar</button>
+          </div>
+        </div>
+        <!-- PRs y fatiga -->
+        <div class="px-4 py-3">
+          <div class="grid gap-2 mb-2" style="grid-template-columns:1fr 1fr 1fr;">
+            ${renderPRCard('Banca', reg.banca, dBanca)}
+            ${renderPRCard('Dominadas', reg.dominadas, dDominadas)}
+            ${renderPRCard('RDL', reg.rdl, dRdl)}
+          </div>
+          ${reg.fatiga !== null ? `
+          <div class="rounded-xl px-3 py-2" style="background:#0D0D0D;">
+            <div class="flex items-center gap-2">
+              <span class="text-muted text-xs">Fatiga:</span>
+              <span class="text-text font-700">${reg.fatiga}/10</span>
+              <span class="text-xs ml-auto">${renderDeltaFlecha(dFatiga, '')}</span>
+            </div>
+            ${renderBarraFatiga(reg.fatiga)}
+          </div>` : ''}
+        </div>
+        <!-- Notas expandibles -->
+        ${reg.notas ? `
+        <div id="${notasId}" class="hidden px-4 pb-3">
+          <p class="text-muted text-xs mb-1">Notas</p>
+          <p class="text-sm" style="color:#F0F0F0; line-height:1.5; white-space:pre-wrap;">${escapeHTML(reg.notas)}</p>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+
+  // Toggle notas
+  document.querySelectorAll('.ci-toggle-notas').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (target) {
+        const oculto = target.classList.toggle('hidden');
+        btn.textContent = oculto ? 'Ver notas' : 'Ocultar notas';
+      }
+    });
+  });
+
+  // Editar desde historial
+  document.querySelectorAll('.ci-editar-btn').forEach(btn => {
+    btn.addEventListener('click', () => abrirFormCheckinEdicion(btn.dataset.mes));
+  });
+}
+
+// ── Formulario check-in ─────────────────────────────────
+
+function abrirFormCheckinNuevo() {
+  ciEditandoMes = null;
+  ciFormTitulo.textContent = 'Check-in — ' + formatearMes(mesActual());
+  inputCiBanca.value     = '';
+  inputCiDominadas.value = '';
+  inputCiRdl.value       = '';
+  inputCiFatiga.value    = '5';
+  ciFatigaValor.textContent = '5';
+  inputCiFatigaActiva.checked = true;
+  inputCiFatiga.disabled = false;
+  inputCiNotas.value     = '';
+  ciFormContainer.classList.remove('hidden');
+  ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => inputCiBanca.focus(), 300);
+}
+
+async function abrirFormCheckinEdicion(mes) {
+  const reg = await obtenerCheckinPorMes(mes);
+  if (!reg) return;
+  ciEditandoMes = mes;
+  ciFormTitulo.textContent = 'Editando — ' + formatearMes(mes);
+  inputCiBanca.value     = reg.banca     !== null ? reg.banca     : '';
+  inputCiDominadas.value = reg.dominadas !== null ? reg.dominadas : '';
+  inputCiRdl.value       = reg.rdl       !== null ? reg.rdl       : '';
+
+  if (reg.fatiga !== null) {
+    inputCiFatigaActiva.checked = true;
+    inputCiFatiga.disabled = false;
+    inputCiFatiga.value = reg.fatiga;
+    ciFatigaValor.textContent = reg.fatiga;
+  } else {
+    inputCiFatigaActiva.checked = false;
+    inputCiFatiga.disabled = true;
+    inputCiFatiga.value = '5';
+    ciFatigaValor.textContent = '5';
+  }
+
+  inputCiNotas.value = reg.notas || '';
+  ciFormContainer.classList.remove('hidden');
+  ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cerrarFormCheckin() {
+  ciFormContainer.classList.add('hidden');
+  ciEditandoMes = null;
+}
+
+function parsearPR(input) {
+  const v = parseFloat(input.value);
+  return input.value.trim() === '' || isNaN(v) ? null : v;
+}
+
+function escapeHTML(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+btnNuevoCheckin.addEventListener('click', abrirFormCheckinNuevo);
+btnCiCancelar.addEventListener('click', cerrarFormCheckin);
+
+btnCiGuardar.addEventListener('click', async () => {
+  const banca     = parsearPR(inputCiBanca);
+  const dominadas = parsearPR(inputCiDominadas);
+  const rdl       = parsearPR(inputCiRdl);
+  const fatiga    = inputCiFatigaActiva.checked ? parseInt(inputCiFatiga.value, 10) : null;
+  const notas     = inputCiNotas.value.trim() || null;
+
+  // Al menos un campo debe tener dato
+  if (banca === null && dominadas === null && rdl === null && fatiga === null && !notas) {
+    const hint = document.createElement('div');
+    hint.textContent = 'Completá al menos un campo antes de guardar';
+    hint.style.cssText = `
+      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+      background:#1A1A1A; color:#FF4D4D; border:1px solid #FF4D4D;
+      padding:10px 20px; border-radius:999px; font-size:13px;
+      z-index:9999; white-space:nowrap;`;
+    document.body.appendChild(hint);
+    setTimeout(() => hint.remove(), 2500);
+    return;
+  }
+
+  const mes = ciEditandoMes || mesActual();
+  await guardarCheckin(mes, { banca, dominadas, rdl, fatiga, notas });
+
+  cerrarFormCheckin();
+  await renderCheckinUI();
+  mostrarDashboardBadge();
+
+  const toast = document.createElement('div');
+  toast.textContent = '✓ Check-in guardado';
+  toast.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
+    padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
+    z-index:9999; white-space:nowrap;`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2000);
 });

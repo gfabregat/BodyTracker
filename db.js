@@ -244,3 +244,113 @@ function formatearMes(mesISO) {
   const fecha = new Date(y, m - 1, 1);
   return fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 }
+
+// ─────────────────────────────────────────────────────────
+//  CHECK-IN MENSUAL
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Guarda (o actualiza) el check-in del mes indicado.
+ * Todos los campos son opcionales — se guarda lo que venga.
+ * @param {string} mes   - YYYY-MM
+ * @param {object} datos - { banca, dominadas, rdl, fatiga, notas }
+ *                         Cualquier campo puede ser null.
+ */
+async function guardarCheckin(mes, datos) {
+  await db.Checkin_Mensual.put({
+    fecha:     mes,
+    banca:     datos.banca     ?? null,
+    dominadas: datos.dominadas ?? null,
+    rdl:       datos.rdl       ?? null,
+    fatiga:    datos.fatiga    ?? null,
+    notas:     datos.notas     ?? null,
+  });
+}
+
+/**
+ * Obtiene el check-in de un mes específico.
+ * @param {string} mes - YYYY-MM
+ * @returns {object|undefined}
+ */
+async function obtenerCheckinPorMes(mes) {
+  return db.Checkin_Mensual.get(mes);
+}
+
+/**
+ * Obtiene todos los check-ins ordenados por fecha ascendente.
+ * @returns {Array}
+ */
+async function obtenerTodosLosCheckins() {
+  return db.Checkin_Mensual.orderBy('fecha').toArray();
+}
+
+/**
+ * Calcula delta de PR entre dos valores.
+ * @param {number|null} anterior
+ * @param {number|null} actual
+ * @returns {{ valor: number|null, direccion: 'mejor'|'peor'|'neutral' }}
+ */
+function calcularDeltaPR(anterior, actual) {
+  if (anterior === null || actual === null) return { valor: null, direccion: 'neutral' };
+  const diff = actual - anterior;
+  const umbral = 1; // kg
+  if (Math.abs(diff) < umbral) return { valor: diff, direccion: 'neutral' };
+  return { valor: diff, direccion: diff > 0 ? 'mejor' : 'peor' };
+}
+
+/**
+ * Calcula delta de fatiga (bajar es mejor).
+ */
+function calcularDeltaFatiga(anterior, actual) {
+  if (anterior === null || actual === null) return { valor: null, direccion: 'neutral' };
+  const diff = actual - anterior;
+  if (Math.abs(diff) < 1) return { valor: diff, direccion: 'neutral' };
+  return { valor: diff, direccion: diff < 0 ? 'mejor' : 'peor' };
+}
+
+// ─────────────────────────────────────────────────────────
+//  NOTIFICACIONES — Lógica de in-app banners
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Verifica si hay que mostrar banners de recordatorio al abrir la app.
+ * Devuelve un array de mensajes a mostrar (puede ser vacío).
+ */
+async function verificarRecordatorios() {
+  const mensajes = [];
+  const hoyStr = hoy();
+  const hoyDate = new Date();
+
+  // ── Recordatorio 1: domingo previo al primer lunes del mes ──
+  // Mostramos si hoy es domingo y el próximo lunes es el primero del mes
+  if (hoyDate.getDay() === 0) { // 0 = domingo
+    const proximoLunes = new Date(hoyDate);
+    proximoLunes.setDate(hoyDate.getDate() + 1);
+    if (proximoLunes.getDate() <= 7) {
+      // El próximo lunes es el primero del mes (está en la primera semana)
+      const mesProximoLunes = `${proximoLunes.getFullYear()}-${String(proximoLunes.getMonth() + 1).padStart(2, '0')}`;
+      const checkinExiste = await obtenerCheckinPorMes(mesProximoLunes);
+      const medicionExiste = await obtenerMedicionPorMes(mesProximoLunes);
+      if (!checkinExiste && !medicionExiste) {
+        mensajes.push('📏 Mañana es día de mediciones y check-in. Recordá hacerlo en ayunas.');
+      }
+    }
+  }
+
+  // ── Recordatorio 2: 3+ días sin registrar peso ──
+  const ultimosPesos = await db.Registro_Peso
+    .orderBy('fecha')
+    .reverse()
+    .limit(1)
+    .toArray();
+
+  if (ultimosPesos.length > 0) {
+    const ultimaFecha = new Date(ultimosPesos[0].fecha + 'T12:00:00');
+    const diasSinPeso = Math.floor((hoyDate - ultimaFecha) / (1000 * 60 * 60 * 24));
+    if (diasSinPeso >= 3) {
+      mensajes.push(`⚖️ Llevas ${diasSinPeso} días sin registrar tu peso. Registrarlo hoy ayuda a mantener la media móvil precisa.`);
+    }
+  }
+
+  return mensajes;
+}

@@ -336,13 +336,127 @@
   </section>
 
   <!-- ═══════════════════════════════════════
-       PANTALLA: CHECK-IN (placeholder Fase 3)
+       PANTALLA: CHECK-IN MENSUAL
   ════════════════════════════════════════ -->
-  <section id="screen-checkin" class="screen flex-1 min-h-0 items-center justify-center">
-    <div class="text-center px-8">
-      <div class="text-4xl mb-4">🏆</div>
-      <p class="text-text font-600 text-lg mb-2">Check-in mensual</p>
-      <p class="text-muted text-sm">Disponible en Fase 3</p>
+  <section id="screen-checkin" class="screen flex-1 min-h-0 flex-col">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
+      <div>
+        <p id="ci-mes-label" class="text-muted text-xs font-medium uppercase tracking-widest"></p>
+        <h1 class="text-text text-xl font-700 leading-tight">Check-in</h1>
+      </div>
+      <button id="btn-nuevo-checkin"
+        class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+        style="background:#C8F135; color:#0D0D0D; min-height:40px;">
+        + Nuevo
+      </button>
+    </header>
+
+    <!-- Contenido scrolleable -->
+    <div class="flex-1 min-h-0 scroll-y px-5 pb-4">
+
+      <!-- BANNER de recordatorio (oculto por defecto) -->
+      <div id="ci-banner" class="hidden mb-4 px-4 py-3 rounded-2xl"
+        style="background:#1A1A1A; border:1px solid #2A2A2A;">
+        <p id="ci-banner-texto" class="text-sm" style="color:#C8F135;"></p>
+      </div>
+
+      <!-- FORMULARIO -->
+      <div id="ci-form-container" class="hidden mb-5">
+        <div class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+          <p class="text-text font-600 mb-1" id="ci-form-titulo">Check-in mensual</p>
+          <p class="text-muted text-xs mb-5">Todos los campos son opcionales. Guardá lo que tengas y completá después.</p>
+
+          <!-- PRs -->
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Marcas personales (kg)</p>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 mb-1 block">Press de Banca</label>
+            <input id="ci-banca" type="number" inputmode="decimal" step="0.5" min="0" max="500"
+              placeholder="ej: 100.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 mb-1 block">Dominadas Lastradas (kg adicionales)</label>
+            <input id="ci-dominadas" type="number" inputmode="decimal" step="0.5" min="0" max="200"
+              placeholder="ej: 20.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-5">
+            <label class="text-muted text-xs font-500 mb-1 block">RDL</label>
+            <input id="ci-rdl" type="number" inputmode="decimal" step="0.5" min="0" max="500"
+              placeholder="ej: 140.0"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <!-- Fatiga -->
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fatiga de la última semana</p>
+          <div class="mb-2">
+            <div class="flex justify-between text-xs text-muted mb-2">
+              <span>1 — Sin fatiga</span>
+              <span>10 — Agotamiento total</span>
+            </div>
+            <input id="ci-fatiga" type="range" min="1" max="10" step="1" value="5"
+              style="width:100%; accent-color:#C8F135; cursor:pointer;" />
+            <div class="flex justify-between mt-1">
+              <span class="text-xs text-muted">1</span>
+              <span id="ci-fatiga-valor" class="text-accent font-700 text-sm">5</span>
+              <span class="text-xs text-muted">10</span>
+            </div>
+          </div>
+          <!-- Toggle para incluir/excluir fatiga -->
+          <div class="flex items-center gap-2 mb-5 mt-3">
+            <input id="ci-fatiga-activa" type="checkbox" checked
+              style="accent-color:#C8F135; width:16px; height:16px; cursor:pointer;" />
+            <label for="ci-fatiga-activa" class="text-muted text-xs cursor-pointer">Incluir fatiga en este check-in</label>
+          </div>
+
+          <!-- Notas -->
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Notas de contexto <span style="font-weight:400;">(opcional)</span></p>
+          <textarea id="ci-notas" rows="3"
+            placeholder="Ej: Viajé 10 días, semana de estrés laboral alto, dormí mal..."
+            class="w-full px-4 py-3 rounded-xl text-text text-sm resize-none mb-5"
+            style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; font-family:Inter,sans-serif; line-height:1.5;"></textarea>
+
+          <!-- Botones -->
+          <div class="flex gap-3">
+            <button id="btn-ci-cancelar"
+              class="flex-1 py-3 rounded-xl text-sm font-600 transition-all active:scale-95"
+              style="background:transparent; border:1px solid #2A2A2A; color:#6B6B6B;">
+              Cancelar
+            </button>
+            <button id="btn-ci-guardar"
+              class="flex-1 py-3 rounded-xl text-sm font-700 transition-all active:scale-95"
+              style="background:#C8F135; color:#0D0D0D;">
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESUMEN MES ACTUAL (si existe check-in) -->
+      <div id="ci-resumen-container" class="hidden mb-5">
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Este mes</p>
+        <div id="ci-resumen" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+          <!-- Generado por JS -->
+        </div>
+      </div>
+
+      <!-- HISTORIAL -->
+      <div>
+        <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Historial</p>
+        <div id="ci-historial-empty" class="hidden py-6 text-center">
+          <p class="text-muted text-sm">Todavía no hay check-ins registrados.</p>
+        </div>
+        <div id="ci-historial" class="flex flex-col gap-3"></div>
+      </div>
+
     </div>
   </section>
 
@@ -408,10 +522,16 @@
     </button>
 
     <button data-tab="dashboard" class="nav-item relative flex flex-col items-center justify-center gap-1 py-2 px-4 min-h-[56px] min-w-[56px]">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-        <line x1="6" y1="20" x2="6" y2="14"/>
-      </svg>
+      <div class="relative">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span id="dashboard-badge" class="hidden" style="
+          position:absolute; top:-2px; right:-4px;
+          width:8px; height:8px; border-radius:50%;
+          background:#C8F135; border:1.5px solid #0D0D0D;"></span>
+      </div>
       <span class="text-[10px] font-500">Dashboard</span>
     </button>
 
