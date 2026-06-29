@@ -1750,6 +1750,7 @@ const dashPesoActual       = document.getElementById('dash-peso-actual');
 const dashPesoDelta        = document.getElementById('dash-peso-delta');
 const dashPesoChartEmpty   = document.getElementById('dash-peso-chart-empty');
 const dashMediciones       = document.getElementById('dash-mediciones');
+const dashMacros           = document.getElementById('dash-macros');
 const dashPRs              = document.getElementById('dash-prs');
 const dashFatiga           = document.getElementById('dash-fatiga');
 const dashNotasContainer   = document.getElementById('dash-notas-container');
@@ -1834,6 +1835,34 @@ async function renderDashboard(mes) {
 
   // Mini gráfico 3 meses
   await renderDashMiniChart(mes);
+
+  // ── Macros ────────────────────────────────────────────
+  const promedioMacrosDash = await calcularPromedioMacrosMes(mes);
+
+  if (promedioMacrosDash.diasConDato > 0) {
+    const p = promedioMacrosDash;
+    dashMacros.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-muted text-xs">Promedio diario</span>
+        <span class="text-muted text-xs">${p.diasConDato} de ${p.diasTotales} días registrados</span>
+      </div>
+      <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">Proteína</p>
+          <p class="text-text font-700">${p.proteina ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">Carbos</p>
+          <p class="text-text font-700">${p.carbos ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0D0D0D;">
+          <p class="text-muted text-xs mb-1">Grasas</p>
+          <p class="text-text font-700">${p.grasas ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
+        </div>
+      </div>`;
+  } else {
+    dashMacros.innerHTML = `<p class="text-muted text-sm">Sin registros de macros este mes.</p>`;
+  }
 
   // ── Mediciones ────────────────────────────────────────
   const medActual   = await obtenerMedicionPorMes(mes);
