@@ -666,7 +666,9 @@
     </div>
 
     <!-- Input file oculto -->
-    <input type="file" id="foto-file-input" accept="image/*" capture="environment" class="hidden" />
+    <!-- Inputs separados: cámara (capture) y galería (sin capture) -->
+    <input type="file" id="foto-file-camara" accept="image/*" capture="environment" class="hidden" />
+    <input type="file" id="foto-file-galeria" accept="image/*" class="hidden" />
 
   </section>
 
@@ -677,21 +679,42 @@
     display:none; align-items:flex-end; justify-content:center;">
     <div class="w-full rounded-t-3xl p-6" style="background:#1A1A1A; border-top:1px solid #2A2A2A; max-width:480px;">
 
-      <!-- Selector de mes -->
-      <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Mes</label>
-      <select id="foto-modal-mes-selector"
-        class="w-full px-4 py-3 rounded-xl text-sm font-600 mb-5"
-        style="background:#0D0D0D; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;">
-      </select>
+      <!-- PASO 1: mes + pose -->
+      <div id="foto-modal-paso-pose">
+        <!-- Selector de mes -->
+        <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Mes</label>
+        <select id="foto-modal-mes-selector"
+          class="w-full px-4 py-3 rounded-xl text-sm font-600 mb-5"
+          style="background:#0D0D0D; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;">
+        </select>
 
-      <p class="text-text font-600 text-base mb-5">¿Qué pose es esta foto?</p>
-      <div class="flex flex-col gap-3">
-        <button data-pose="frente"  class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Frente</button>
-        <button data-pose="espalda" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Espalda</button>
-        <button data-pose="perfilD" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Derecho</button>
-        <button data-pose="perfilI" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Izquierdo</button>
-        <button id="foto-pose-cancelar" class="w-full py-3 rounded-2xl text-sm font-600" style="background:transparent; color:#6B6B6B;">Cancelar</button>
+        <p class="text-text font-600 text-base mb-5">¿Qué pose es esta foto?</p>
+        <div class="flex flex-col gap-3">
+          <button data-pose="frente"  class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Frente</button>
+          <button data-pose="espalda" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Espalda</button>
+          <button data-pose="perfilD" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Derecho</button>
+          <button data-pose="perfilI" class="foto-pose-select w-full py-4 rounded-2xl text-sm font-600 transition-all active:scale-95" style="background:#2A2A2A; color:#F0F0F0;">Perfil Izquierdo</button>
+          <button id="foto-pose-cancelar" class="w-full py-3 rounded-2xl text-sm font-600" style="background:transparent; color:#6B6B6B;">Cancelar</button>
+        </div>
       </div>
+
+      <!-- PASO 2: fuente (cámara / galería) -->
+      <div id="foto-modal-paso-fuente" class="hidden">
+        <p id="foto-fuente-titulo" class="text-text font-600 text-base mb-1">Elegí el origen</p>
+        <p id="foto-fuente-subtitulo" class="text-muted text-xs mb-5"></p>
+        <div class="flex flex-col gap-3">
+          <button id="foto-fuente-camara" class="w-full py-4 rounded-2xl text-sm font-700 transition-all active:scale-95 flex items-center justify-center gap-2" style="background:#C8F135; color:#0D0D0D;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Tomar foto con la cámara
+          </button>
+          <button id="foto-fuente-galeria" class="w-full py-4 rounded-2xl text-sm font-700 transition-all active:scale-95 flex items-center justify-center gap-2" style="background:#2A2A2A; color:#F0F0F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Elegir de la galería
+          </button>
+          <button id="foto-fuente-volver" class="w-full py-3 rounded-2xl text-sm font-600" style="background:transparent; color:#6B6B6B;">← Volver</button>
+        </div>
+      </div>
+
     </div>
   </div>
 

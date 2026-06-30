@@ -1316,10 +1316,17 @@ const fotosGridEmpty     = document.getElementById('fotos-grid-empty');
 const btnNuevaFoto       = document.getElementById('btn-nueva-foto');
 const btnCompararFotos   = document.getElementById('btn-comparar-fotos');
 const btnCerrarComparar  = document.getElementById('btn-cerrar-comparar');
-const fotoFileInput      = document.getElementById('foto-file-input');
+const fotoFileCamara     = document.getElementById('foto-file-camara');
+const fotoFileGaleria    = document.getElementById('foto-file-galeria');
 const fotoPoseModal      = document.getElementById('foto-pose-modal');
 const fotoModalMesSelector = document.getElementById('foto-modal-mes-selector');
 const fotoPoseCancelar   = document.getElementById('foto-pose-cancelar');
+const fotoModalPasoPose  = document.getElementById('foto-modal-paso-pose');
+const fotoModalPasoFuente= document.getElementById('foto-modal-paso-fuente');
+const fotoFuenteSubtitulo= document.getElementById('foto-fuente-subtitulo');
+const fotoFuenteCamara   = document.getElementById('foto-fuente-camara');
+const fotoFuenteGaleria  = document.getElementById('foto-fuente-galeria');
+const fotoFuenteVolver   = document.getElementById('foto-fuente-volver');
 const fotoExpandModal    = document.getElementById('foto-expand-modal');
 const fotoExpandImg      = document.getElementById('foto-expand-img');
 const fotoExpandLabel    = document.getElementById('foto-expand-label');
@@ -1336,6 +1343,7 @@ let fotoPoseSeleccionada  = null; // pose elegida en el modal
 let fotoMesSubida         = null; // mes al que pertenece la foto que se sube
 let fotoArchivoTemporal   = null; // File object antes de elegir pose
 let comparadorPoseActual  = 'frente';
+let huboPasoPose          = false; // si el flujo actual pasó por el paso de elegir pose
 
 // ── Inicialización ──────────────────────────────────────
 
@@ -1480,22 +1488,47 @@ function generarOpcionesMesSubida(mesPreseleccionado) {
 
 /**
  * Inicia el flujo de subida de foto.
- * Si se pasa pose, la usa directamente (desde botón de pose vacía — el mes ya está fijado por contexto).
- * Si no se pasa pose, abre el modal de selección con selector de mes.
+ * Si se pasa pose, salta directo al paso de elegir fuente (cámara/galería),
+ * con el mes ya fijado por contexto (grid o comparador).
+ * Si no se pasa pose, abre el modal completo: mes + pose, y luego fuente.
  */
 function iniciarSubidaFoto(mes, poseDirecta = null) {
   fotoMesSubida = mes || mesActual();
   fotoPoseSeleccionada = poseDirecta;
 
+  fotoPoseModal.style.display = 'flex';
+  fotoPoseModal.classList.remove('hidden');
+
   if (poseDirecta) {
-    // Ir directo al selector de archivo — el mes ya viene definido por el contexto (grid o comparador)
-    fotoFileInput.click();
+    // Saltar directo al paso de fuente — mes y pose ya definidos por contexto
+    huboPasoPose = false;
+    mostrarPasoFuente();
   } else {
-    // Abrir modal con selector de mes + selección de pose
+    // Mostrar paso 1: mes + pose
+    huboPasoPose = true;
     generarOpcionesMesSubida(fotoMesSubida);
-    fotoPoseModal.style.display = 'flex';
-    fotoPoseModal.classList.remove('hidden');
+    mostrarPasoPose();
   }
+}
+
+function mostrarPasoPose() {
+  fotoModalPasoPose.classList.remove('hidden');
+  fotoModalPasoFuente.classList.add('hidden');
+}
+
+function mostrarPasoFuente() {
+  fotoModalPasoPose.classList.add('hidden');
+  fotoModalPasoFuente.classList.remove('hidden');
+  // Subtítulo con contexto de mes y pose
+  const poseLabel = POSES_LABELS[fotoPoseSeleccionada] || '';
+  fotoFuenteSubtitulo.textContent = `${formatearMes(fotoMesSubida)} · ${poseLabel}`;
+}
+
+function cerrarModalPose() {
+  fotoPoseModal.style.display = 'none';
+  fotoPoseModal.classList.add('hidden');
+  fotoMesSubida = null;
+  fotoPoseSeleccionada = null;
 }
 
 // Botón "+ Foto" del header
@@ -1504,22 +1537,38 @@ btnNuevaFoto.addEventListener('click', () => {
 });
 
 // Cancelar modal de pose
-fotoPoseCancelar.addEventListener('click', () => {
-  fotoPoseModal.style.display = 'none';
-  fotoPoseModal.classList.add('hidden');
-  fotoMesSubida = null;
-  fotoPoseSeleccionada = null;
-});
+fotoPoseCancelar.addEventListener('click', cerrarModalPose);
 
-// Seleccionar pose en el modal — toma el mes elegido en el selector en ese momento
+// Seleccionar pose en el modal — toma el mes elegido y pasa al paso de fuente
 document.querySelectorAll('.foto-pose-select').forEach(btn => {
   btn.addEventListener('click', () => {
     fotoMesSubida = fotoModalMesSelector.value || mesActual();
     fotoPoseSeleccionada = btn.dataset.pose;
-    fotoPoseModal.style.display = 'none';
-    fotoPoseModal.classList.add('hidden');
-    fotoFileInput.click();
+    mostrarPasoFuente();
   });
+});
+
+// Volver del paso de fuente: al paso de pose si vino del flujo completo, o cerrar si vino por contexto
+fotoFuenteVolver.addEventListener('click', () => {
+  if (huboPasoPose) {
+    mostrarPasoPose();
+  } else {
+    cerrarModalPose();
+  }
+});
+
+// Elegir cámara → dispara el input con capture
+fotoFuenteCamara.addEventListener('click', () => {
+  fotoPoseModal.style.display = 'none';
+  fotoPoseModal.classList.add('hidden');
+  fotoFileCamara.click();
+});
+
+// Elegir galería → dispara el input sin capture
+fotoFuenteGaleria.addEventListener('click', () => {
+  fotoPoseModal.style.display = 'none';
+  fotoPoseModal.classList.add('hidden');
+  fotoFileGaleria.click();
 });
 
 // ── Modal de crop ───────────────────────────────────────
@@ -1632,14 +1681,13 @@ btnCropConfirmar.addEventListener('click', async () => {
   }
 });
 
-// Procesar archivo seleccionado — ahora abre el crop en lugar de guardar directo
-fotoFileInput.addEventListener('change', async (e) => {
+// Procesar archivo seleccionado — abre el crop. Compartido por ambos inputs (cámara y galería).
+function procesarArchivoFoto(e) {
   const file = e.target.files[0];
-  fotoFileInput.value = '';
+  e.target.value = ''; // Reset para permitir volver a elegir el mismo archivo
 
   if (!file || !fotoPoseSeleccionada || !fotoMesSubida) return;
 
-  // Leer el archivo como Data URL para pasarlo al cropper
   const reader = new FileReader();
   reader.onload = (ev) => {
     abrirCropModal(ev.target.result);
@@ -1656,7 +1704,10 @@ fotoFileInput.addEventListener('change', async (e) => {
     setTimeout(() => toast.remove(), 3000);
   };
   reader.readAsDataURL(file);
-});
+}
+
+fotoFileCamara.addEventListener('change', procesarArchivoFoto);
+fotoFileGaleria.addEventListener('change', procesarArchivoFoto);
 
 // ── Vista comparación ───────────────────────────────────
 
