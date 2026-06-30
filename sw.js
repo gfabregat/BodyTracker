@@ -5,7 +5,7 @@
 //  Las operaciones de datos van directo a IndexedDB, sin cache aquí.
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'body-tracker-v6d';
+const CACHE_NAME = 'body-tracker-v6e';
 
 // Assets que se cachean en la instalación del SW.
 // Las CDNs externas se cachean en el primer acceso (runtime caching).

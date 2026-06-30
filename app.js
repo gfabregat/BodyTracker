@@ -1368,29 +1368,30 @@ async function renderGaleriaFotos() {
     const posesHTML = POSES.map(pose => {
       const tieneFoto = !!reg[pose];
       return `
-        <div class="relative" style="aspect-ratio:3/4;">
-          ${tieneFoto
-            ? `<img src="data:image/jpeg;base64,${reg[pose]}"
-                 alt="${POSES_LABELS[pose]}"
-                 class="foto-thumb-tap w-full h-full rounded-xl object-cover cursor-pointer"
-                 data-mes="${reg.fecha}" data-pose="${pose}"
-                 style="display:block;" />`
-            : `<div class="w-full h-full rounded-xl flex items-center justify-center"
-                 style="background:#1A1A1A; border:1px dashed #2A2A2A;">
-                 <button class="foto-agregar-btn flex flex-col items-center gap-1"
+        <div class="flex flex-col">
+          <div class="relative" style="aspect-ratio:3/4;">
+            ${tieneFoto
+              ? `<img src="data:image/jpeg;base64,${reg[pose]}"
+                   alt="${POSES_LABELS[pose]}"
+                   class="foto-thumb-tap w-full h-full rounded-xl object-cover cursor-pointer"
                    data-mes="${reg.fecha}" data-pose="${pose}"
-                   style="background:transparent; border:none; color:#6B6B6B;">
-                   <span style="font-size:20px;">+</span>
-                   <span style="font-size:10px;">${POSES_LABELS[pose]}</span>
-                 </button>
-               </div>`
-          }
-          ${tieneFoto
-            ? `<button class="foto-eliminar-btn absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
-                 data-mes="${reg.fecha}" data-pose="${pose}"
-                 style="background:rgba(0,0,0,0.7); border:none; color:#F0F0F0; font-size:12px; line-height:1;">✕</button>`
-            : ''}
-          <p class="text-center text-muted mt-1" style="font-size:10px;">${POSES_LABELS[pose]}</p>
+                   style="display:block;" />`
+              : `<div class="w-full h-full rounded-xl flex items-center justify-center"
+                   style="background:#1A1A1A; border:1px dashed #2A2A2A;">
+                   <button class="foto-agregar-btn flex flex-col items-center gap-1"
+                     data-mes="${reg.fecha}" data-pose="${pose}"
+                     style="background:transparent; border:none; color:#6B6B6B;">
+                     <span style="font-size:20px;">+</span>
+                   </button>
+                 </div>`
+            }
+            ${tieneFoto
+              ? `<button class="foto-eliminar-btn absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                   data-mes="${reg.fecha}" data-pose="${pose}"
+                   style="background:rgba(0,0,0,0.7); border:none; color:#F0F0F0; font-size:12px; line-height:1;">✕</button>`
+              : ''}
+          </div>
+          <p class="text-center text-muted" style="font-size:10px; margin-top:4px; line-height:1.2;">${POSES_LABELS[pose]}</p>
         </div>`;
     }).join('');
 
@@ -1543,22 +1544,25 @@ function abrirCropModal(imageSrc) {
       cropperInstance.destroy();
       cropperInstance = null;
     }
-    cropperInstance = new Cropper(cropImagen, {
-      viewMode: 1,        // La imagen no puede salir del contenedor
-      autoCropArea: 0.9,  // Área de crop inicial: 90% de la imagen
-      aspectRatio: NaN,   // Libre
-      movable: true,
-      zoomable: true,
-      rotatable: true,
-      scalable: false,
-      responsive: true,
-      checkOrientation: true,
-      guides: true,
-      center: true,
-      highlight: false,
-      background: true,
-      modal: true,
-    });
+    // Pequeño delay para que el layout flex del modal termine de calcular dimensiones
+    setTimeout(() => {
+      cropperInstance = new Cropper(cropImagen, {
+        viewMode: 2,        // La imagen cubre el contenedor sin dejar huecos, ajustando al área visible
+        autoCropArea: 0.95, // Área de crop inicial: 95% de la imagen
+        aspectRatio: NaN,   // Libre
+        movable: true,
+        zoomable: true,
+        rotatable: true,
+        scalable: false,
+        responsive: true,
+        checkOrientation: true,
+        guides: true,
+        center: true,
+        highlight: false,
+        background: true,
+        modal: true,
+      });
+    }, 50);
   };
 }
 

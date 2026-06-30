@@ -115,7 +115,8 @@
     ::-webkit-scrollbar { width: 0; }
 
     /* Cropper overrides — fondo oscuro */
-    .cropper-container { max-height: 60vh !important; }
+    /* El contenedor #crop-area (flex-1) define el espacio; Cropper se ajusta a él */
+    #crop-area .cropper-container { max-width: 100% !important; max-height: 100% !important; }
     .cropper-bg { background-image: none; background-color: #0D0D0D; }
     .cropper-modal { background: #0D0D0D; opacity: 0.8; }
     .cropper-view-box { outline-color: #C8F135; }
@@ -665,7 +666,7 @@
     </div>
 
     <!-- Input file oculto -->
-    <input type="file" id="foto-file-input" accept="image/*" class="hidden" />
+    <input type="file" id="foto-file-input" accept="image/*" capture="environment" class="hidden" />
 
   </section>
 
@@ -1042,19 +1043,21 @@
   display:none; flex-direction:column;">
 
   <!-- Header del crop -->
-  <div class="flex items-center justify-between px-5 py-4" style="flex-shrink:0; border-bottom:1px solid #2A2A2A;">
-    <button id="btn-crop-cancelar" class="text-sm font-600" style="background:transparent; border:none; color:#6B6B6B;">
+  <div class="flex items-center justify-between px-4 py-3" style="flex-shrink:0; border-bottom:1px solid #2A2A2A; gap:12px;">
+    <button id="btn-crop-cancelar" class="text-sm font-600" style="background:transparent; border:none; color:#6B6B6B; white-space:nowrap; padding:8px 4px;">
       Cancelar
     </button>
-    <p class="text-text text-sm font-600">Recortar foto</p>
-    <button id="btn-crop-confirmar" class="text-sm font-700" style="background:transparent; border:none; color:#C8F135;">
+    <p class="text-text text-sm font-600" style="white-space:nowrap;">Recortar foto</p>
+    <button id="btn-crop-confirmar"
+      class="text-sm font-700 rounded-xl transition-all active:scale-95"
+      style="background:#C8F135; color:#0D0D0D; border:none; white-space:nowrap; padding:8px 18px; min-height:38px;">
       Guardar
     </button>
   </div>
 
   <!-- Área de crop -->
-  <div class="flex-1 min-h-0 flex items-center justify-center" style="overflow:hidden; background:#0D0D0D;">
-    <img id="crop-imagen" src="" alt="Recortar" style="max-width:100%; display:block;" />
+  <div id="crop-area" class="flex-1 min-h-0 flex items-center justify-center" style="overflow:hidden; background:#0D0D0D; padding:12px;">
+    <img id="crop-imagen" src="" alt="Recortar" style="display:block; max-width:100%; max-height:100%;" />
   </div>
 
   <!-- Controles -->
