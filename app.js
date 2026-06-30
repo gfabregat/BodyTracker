@@ -1318,7 +1318,7 @@ const btnCompararFotos   = document.getElementById('btn-comparar-fotos');
 const btnCerrarComparar  = document.getElementById('btn-cerrar-comparar');
 const fotoFileInput      = document.getElementById('foto-file-input');
 const fotoPoseModal      = document.getElementById('foto-pose-modal');
-const fotoModalMes       = document.getElementById('foto-modal-mes');
+const fotoModalMesSelector = document.getElementById('foto-modal-mes-selector');
 const fotoPoseCancelar   = document.getElementById('foto-pose-cancelar');
 const fotoExpandModal    = document.getElementById('foto-expand-modal');
 const fotoExpandImg      = document.getElementById('foto-expand-img');
@@ -1462,20 +1462,36 @@ fotoExpandModal.addEventListener('click', (e) => {
 // ── Subida de foto ──────────────────────────────────────
 
 /**
+ * Genera las opciones de mes para el selector de subida (mes actual + 2 anteriores).
+ */
+function generarOpcionesMesSubida(mesPreseleccionado) {
+  const opciones = [];
+  const [y, m] = mesActual().split('-').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    const mesISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    opciones.push(mesISO);
+  }
+  fotoModalMesSelector.innerHTML = opciones.map(m =>
+    `<option value="${m}" ${m === mesPreseleccionado ? 'selected' : ''}>${formatearMes(m)}</option>`
+  ).join('');
+}
+
+/**
  * Inicia el flujo de subida de foto.
- * Si se pasa pose, la usa directamente (desde botón de pose vacía).
- * Si no se pasa pose, abre el modal de selección.
+ * Si se pasa pose, la usa directamente (desde botón de pose vacía — el mes ya está fijado por contexto).
+ * Si no se pasa pose, abre el modal de selección con selector de mes.
  */
 function iniciarSubidaFoto(mes, poseDirecta = null) {
   fotoMesSubida = mes || mesActual();
   fotoPoseSeleccionada = poseDirecta;
 
   if (poseDirecta) {
-    // Ir directo al selector de archivo
+    // Ir directo al selector de archivo — el mes ya viene definido por el contexto (grid o comparador)
     fotoFileInput.click();
   } else {
-    // Abrir modal de selección de pose primero
-    fotoModalMes.textContent = formatearMes(fotoMesSubida);
+    // Abrir modal con selector de mes + selección de pose
+    generarOpcionesMesSubida(fotoMesSubida);
     fotoPoseModal.style.display = 'flex';
     fotoPoseModal.classList.remove('hidden');
   }
@@ -1494,9 +1510,10 @@ fotoPoseCancelar.addEventListener('click', () => {
   fotoPoseSeleccionada = null;
 });
 
-// Seleccionar pose en el modal
+// Seleccionar pose en el modal — toma el mes elegido en el selector en ese momento
 document.querySelectorAll('.foto-pose-select').forEach(btn => {
   btn.addEventListener('click', () => {
+    fotoMesSubida = fotoModalMesSelector.value || mesActual();
     fotoPoseSeleccionada = btn.dataset.pose;
     fotoPoseModal.style.display = 'none';
     fotoPoseModal.classList.add('hidden');
@@ -1584,6 +1601,7 @@ btnCropConfirmar.addEventListener('click', async () => {
     });
 
     const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    const mesGuardado = fotoMesSubida;
     await guardarFoto(fotoMesSubida, fotoPoseSeleccionada, base64);
 
     cerrarCropModal();
@@ -1595,7 +1613,7 @@ btnCropConfirmar.addEventListener('click', async () => {
     }
 
     const toast = document.createElement('div');
-    toast.textContent = '✓ Foto guardada';
+    toast.textContent = `✓ Guardada en ${formatearMes(mesGuardado)}`;
     toast.style.cssText = `
       position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
       background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
