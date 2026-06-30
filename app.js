@@ -1377,14 +1377,14 @@ async function renderGaleriaFotos() {
       const tieneFoto = !!reg[pose];
       return `
         <div class="flex flex-col">
-          <div class="relative" style="aspect-ratio:3/4;">
+          <div class="relative rounded-xl" style="height:120px; overflow:hidden;">
             ${tieneFoto
               ? `<img src="data:image/jpeg;base64,${reg[pose]}"
                    alt="${POSES_LABELS[pose]}"
-                   class="foto-thumb-tap w-full h-full rounded-xl object-cover cursor-pointer"
+                   class="foto-thumb-tap cursor-pointer"
                    data-mes="${reg.fecha}" data-pose="${pose}"
-                   style="display:block;" />`
-              : `<div class="w-full h-full rounded-xl flex items-center justify-center"
+                   style="display:block; width:100%; height:100%; object-fit:cover;" />`
+              : `<div class="w-full h-full flex items-center justify-center"
                    style="background:#1A1A1A; border:1px dashed #2A2A2A;">
                    <button class="foto-agregar-btn flex flex-col items-center gap-1"
                      data-mes="${reg.fecha}" data-pose="${pose}"
