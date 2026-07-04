@@ -964,17 +964,7 @@ btnMedGuardar.addEventListener('click', async () => {
 
   cerrarForm();
   await renderMedicionesUI();
-
-  // Feedback visual breve
-  const toast = document.createElement('div');
-  toast.textContent = '✓ Medición guardada';
-  toast.style.cssText = `
-    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-    background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
-    padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
-    z-index:9999; white-space:nowrap; pointer-events:none;`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+  mostrarToast('✓ Medición guardada', '#C8F135');
 });
 
 // ─────────────────────────────────────────────────────────
@@ -1073,7 +1063,7 @@ function renderResumenCheckin(reg, todos) {
       ${renderPRCard('Dominadas', reg.dominadas, dDominadas)}
       ${renderPRCard('RDL', reg.rdl, dRdl)}
     </div>
-    ${reg.fatiga !== null ? `
+    ${reg.fatiga != null ? `
     <div class="rounded-xl p-3 mb-3" style="background:#0D0D0D;">
       <p class="text-muted text-xs mb-1">Fatiga</p>
       <div class="flex items-center gap-2">
@@ -1154,7 +1144,7 @@ function renderHistorialCheckin(historial, todos) {
             ${renderPRCard('Dominadas', reg.dominadas, dDominadas)}
             ${renderPRCard('RDL', reg.rdl, dRdl)}
           </div>
-          ${reg.fatiga !== null ? `
+          ${reg.fatiga != null ? `
           <div class="rounded-xl px-3 py-2" style="background:#0D0D0D;">
             <div class="flex items-center gap-2">
               <span class="text-muted text-xs">Fatiga:</span>
@@ -1225,7 +1215,7 @@ async function abrirFormCheckinEdicion(mes) {
   inputCiDominadas.value = reg.dominadas !== null ? reg.dominadas : '';
   inputCiRdl.value       = reg.rdl       !== null ? reg.rdl       : '';
 
-  if (reg.fatiga !== null) {
+  if (reg.fatiga != null) {
     inputCiFatigaActiva.checked = true;
     inputCiFatiga.disabled = false;
     inputCiFatiga.value = reg.fatiga;
@@ -1275,15 +1265,7 @@ btnCiGuardar.addEventListener('click', async () => {
 
   // Al menos un campo debe tener dato
   if (banca === null && dominadas === null && rdl === null && fatiga === null && pasos === null && !notas) {
-    const hint = document.createElement('div');
-    hint.textContent = 'Completá al menos un campo antes de guardar';
-    hint.style.cssText = `
-      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-      background:#1A1A1A; color:#FF4D4D; border:1px solid #FF4D4D;
-      padding:10px 20px; border-radius:999px; font-size:13px;
-      z-index:9999; white-space:nowrap;`;
-    document.body.appendChild(hint);
-    setTimeout(() => hint.remove(), 2500);
+    mostrarToast('Completá al menos un campo antes de guardar', '#FF4D4D');
     return;
   }
 
@@ -1293,16 +1275,7 @@ btnCiGuardar.addEventListener('click', async () => {
   cerrarFormCheckin();
   await renderCheckinUI();
   mostrarDashboardBadge();
-
-  const toast = document.createElement('div');
-  toast.textContent = '✓ Check-in guardado';
-  toast.style.cssText = `
-    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-    background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
-    padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
-    z-index:9999; white-space:nowrap;`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+  mostrarToast('✓ Check-in guardado', '#C8F135');
 });
 
 // ─────────────────────────────────────────────────────────
@@ -1341,7 +1314,6 @@ const fotoPoseBtns       = document.querySelectorAll('.foto-pose-btn');
 
 let fotoPoseSeleccionada  = null; // pose elegida en el modal
 let fotoMesSubida         = null; // mes al que pertenece la foto que se sube
-let fotoArchivoTemporal   = null; // File object antes de elegir pose
 let comparadorPoseActual  = 'frente';
 let huboPasoPose          = false; // si el flujo actual pasó por el paso de elegir pose
 
@@ -1665,15 +1637,7 @@ btnCropConfirmar.addEventListener('click', async () => {
       await renderComparacion();
     }
 
-    const toast = document.createElement('div');
-    toast.textContent = `✓ Guardada en ${formatearMes(mesGuardado)}`;
-    toast.style.cssText = `
-      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-      background:#1A1A1A; color:#C8F135; border:1px solid #2A2A2A;
-      padding:10px 20px; border-radius:999px; font-size:13px; font-weight:600;
-      z-index:9999; white-space:nowrap;`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
+    mostrarToast(`✓ Guardada en ${formatearMes(mesGuardado)}`, '#C8F135');
   } catch (err) {
     console.error('[Crop] Error:', err);
     btnCropConfirmar.textContent = 'Guardar';
@@ -1693,15 +1657,7 @@ function procesarArchivoFoto(e) {
     abrirCropModal(ev.target.result);
   };
   reader.onerror = () => {
-    const toast = document.createElement('div');
-    toast.textContent = '✗ Error al leer la imagen';
-    toast.style.cssText = `
-      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-      background:#1A1A1A; color:#FF4D4D; border:1px solid #FF4D4D;
-      padding:10px 20px; border-radius:999px; font-size:13px;
-      z-index:9999; white-space:nowrap;`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    mostrarToast('✗ Error al leer la imagen', '#FF4D4D');
   };
   reader.readAsDataURL(file);
 }
@@ -1968,7 +1924,7 @@ async function renderDashboard(mes) {
       <div class="rounded-xl p-3 mt-2" style="background:#0D0D0D;">
         <p class="text-muted text-xs mb-1">Muslo derecho</p>
         <p class="text-text font-700">${medActual.muslo.toFixed(1)} <span class="text-muted text-xs font-400">cm</span></p>
-        ${medAnterior?.muslo !== null ? `<p class="text-xs mt-1">${renderDeltaFlecha(calcularDeltaMedicion(medAnterior.muslo, medActual.muslo, 'muslo'))}</p>` : ''}
+        ${medAnterior?.muslo != null ? `<p class="text-xs mt-1">${renderDeltaFlecha(calcularDeltaMedicion(medAnterior.muslo, medActual.muslo, 'muslo'))}</p>` : ''}
       </div>` : ''}`;
   } else {
     dashMediciones.innerHTML = `<p class="text-muted text-sm">Sin medición registrada para este mes.</p>`;
@@ -1994,7 +1950,7 @@ async function renderDashboard(mes) {
   }
 
   // ── Fatiga ────────────────────────────────────────────
-  if (ciActual?.fatiga !== null && ciActual?.fatiga !== undefined) {
+  if (ciActual?.fatiga != null) {
     const dFatiga = calcularDeltaFatiga(ciAnterior?.fatiga ?? null, ciActual.fatiga);
     dashFatiga.innerHTML = `
       <div class="flex items-center gap-4">
@@ -2194,7 +2150,7 @@ async function generarInformeMarkdown(mes) {
     const dCin  = medAnterior ? +(medActual.cintura       - medAnterior.cintura).toFixed(1)       : null;
     const dBRel = medAnterior ? +(medActual.brazoRelajado - medAnterior.brazoRelajado).toFixed(1) : null;
     const dBCon = medAnterior ? +(medActual.brazoCont     - medAnterior.brazoCont).toFixed(1)     : null;
-    const dMus  = (medActual.muslo !== null && medAnterior?.muslo !== null)
+    const dMus  = (medActual.muslo != null && medAnterior?.muslo != null)
       ? +(medActual.muslo - medAnterior.muslo).toFixed(1) : null;
 
     lineas.push(`- **Cintura:**         ${medActual.cintura.toFixed(1)} cm${dCin  !== null ? `  (Δ ${signo(dCin)} cm ${flechaTexto(-dCin, 0.5)})` : ''}`);
@@ -2229,9 +2185,9 @@ async function generarInformeMarkdown(mes) {
 
   // ── Fatiga ────────────────────────────────────────────
   lineas.push('## FATIGA SUBJETIVA');
-  if (ciActual?.fatiga !== null && ciActual?.fatiga !== undefined) {
+  if (ciActual?.fatiga != null) {
     lineas.push(`- **Este mes:**     ${ciActual.fatiga}/10`);
-    if (ciAnterior?.fatiga !== null && ciAnterior?.fatiga !== undefined) {
+    if (ciAnterior?.fatiga != null) {
       lineas.push(`- **Mes anterior:** ${ciAnterior.fatiga}/10`);
     }
   } else {
@@ -2358,7 +2314,7 @@ btnExportarJSON.addEventListener('click', async () => {
     const json  = JSON.stringify(datos, null, 2);
     const blob  = new Blob([json], { type: 'application/json' });
     const url   = URL.createObjectURL(blob);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaISOLocal(new Date());
     const a     = document.createElement('a');
     a.href     = url;
     a.download = `bodytracker-backup-${fecha}.json`;
@@ -2482,8 +2438,46 @@ if ('serviceWorker' in navigator) {
 }
 
 // ─────────────────────────────────────────────────────────
+//  BANNER GLOBAL DE RECORDATORIOS
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Muestra el banner global si hay recordatorios pendientes.
+ * Se llama una vez al iniciar la app, para que el aviso sea visible
+ * sin importar en qué pestaña esté el usuario (antes solo se veía
+ * en la pantalla de Check-in).
+ */
+async function mostrarRecordatoriosGlobales() {
+  const mensajes = await verificarRecordatorios();
+  if (!mensajes.length) return;
+
+  const banner = document.getElementById('global-banner');
+  document.getElementById('global-banner-texto').textContent = mensajes[0];
+  banner.classList.remove('hidden');
+  banner.style.display = 'flex';
+}
+
+document.getElementById('global-banner-cerrar').addEventListener('click', () => {
+  const banner = document.getElementById('global-banner');
+  banner.style.display = 'none';
+  banner.classList.add('hidden');
+});
+
+// ─────────────────────────────────────────────────────────
 //  INICIALIZACIÓN
 // ─────────────────────────────────────────────────────────
 
-// Navegar a peso como pantalla inicial y marcarla activa
-navegarA('peso');
+(async () => {
+  // 1. Migración de medias móviles (solo corre la primera vez tras el update)
+  try {
+    await migrarMediasMoviles();
+  } catch (err) {
+    console.error('[migración] Error al recalcular medias:', err);
+  }
+
+  // 2. Pantalla inicial
+  navegarA('peso');
+
+  // 3. Recordatorios globales (no bloquea la carga)
+  mostrarRecordatoriosGlobales();
+})();

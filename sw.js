@@ -5,16 +5,19 @@
 //  Las operaciones de datos van directo a IndexedDB, sin cache aquí.
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'body-tracker-v6g';
+const CACHE_NAME = 'body-tracker-v7';
 
 // Assets que se cachean en la instalación del SW.
+// IMPORTANTE: rutas RELATIVAS ('./'), que se resuelven contra el scope del SW
+// (/BodyTracker/ en GitHub Pages). Las rutas absolutas ('/') apuntaban a la
+// raíz del dominio (404) y hacían fallar silenciosamente toda la instalación.
 // Las CDNs externas se cachean en el primer acceso (runtime caching).
 const ASSETS_ESTATICOS = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/db.js',
-  '/manifest.json',
+  './',
+  './index.html',
+  './app.js',
+  './db.js',
+  './manifest.json',
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -107,8 +110,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Body Tracker', {
       body: data.body || '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-96.png',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
       tag: data.tag || 'body-tracker',
       renotify: false,
     })
@@ -122,7 +125,7 @@ self.addEventListener('notificationclick', (event) => {
       if (clientList.length > 0) {
         return clientList[0].focus();
       }
-      return clients.openWindow('/');
+      return clients.openWindow('./');
     })
   );
 });

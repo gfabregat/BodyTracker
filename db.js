@@ -20,14 +20,22 @@ db.version(2).stores({
 // ─────────────────────────────────────────────────────────
 
 /**
- * Devuelve la fecha local de hoy en formato YYYY-MM-DD.
+ * Formatea un Date a YYYY-MM-DD usando la fecha LOCAL del dispositivo.
+ * IMPORTANTE: usar siempre este helper en lugar de toISOString().slice(0,10),
+ * que devuelve la fecha UTC y produce corrimientos de un día según la zona horaria.
  */
-function hoy() {
-  const d = new Date();
+function fechaISOLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Devuelve la fecha local de hoy en formato YYYY-MM-DD.
+ */
+function hoy() {
+  return fechaISOLocal(new Date());
 }
 
 /**
@@ -52,13 +60,38 @@ async function calcularMediaMovil(fechaHasta, n = 7) {
 
 /**
  * Guarda (o actualiza) el registro de peso de una fecha.
- * Recalcula y persiste la media móvil del día.
+ * Orden importante: primero se persiste el peso nuevo, y DESPUÉS se calcula
+ * la media móvil — así el propio registro del día queda incluido en su media.
+ * (Calcular antes de guardar producía medias corridas un registro.)
  * @param {string} fecha  - YYYY-MM-DD
  * @param {number} peso   - kg (ej: 82.5)
  */
 async function guardarPeso(fecha, peso) {
+  await db.Registro_Peso.put({ fecha, peso, mediaMovil: null });
   const mediaMovil = await calcularMediaMovil(fecha, 7);
-  await db.Registro_Peso.put({ fecha, peso, mediaMovil });
+  await db.Registro_Peso.update(fecha, { mediaMovil });
+}
+
+/**
+ * MIGRACIÓN (una sola vez): recalcula las medias móviles de todo el historial.
+ * Necesaria porque la versión anterior de guardarPeso calculaba la media
+ * antes de persistir el peso del día, dejando todas las medias corridas.
+ * Se ejecuta al iniciar la app; el flag en localStorage evita repetirla.
+ */
+async function migrarMediasMoviles() {
+  const FLAG = 'bodytracker_migracion_medias_v1';
+  if (localStorage.getItem(FLAG)) return;
+
+  const pesos = await db.Registro_Peso.orderBy('fecha').toArray();
+  for (const r of pesos) {
+    const mediaMovil = await calcularMediaMovil(r.fecha, 7);
+    await db.Registro_Peso.update(r.fecha, { mediaMovil });
+  }
+
+  localStorage.setItem(FLAG, '1');
+  if (pesos.length) {
+    console.log(`[migración] Medias móviles recalculadas para ${pesos.length} registros.`);
+  }
 }
 
 /**
@@ -86,7 +119,7 @@ async function obtenerTodosLosPesos() {
 async function obtenerPesosUltimosDias(dias) {
   const desde = new Date();
   desde.setDate(desde.getDate() - dias);
-  const fechaDesde = desde.toISOString().slice(0, 10);
+  const fechaDesde = fechaISOLocal(desde);
   return db.Registro_Peso
     .where('fecha')
     .aboveOrEqual(fechaDesde)
@@ -101,7 +134,7 @@ async function obtenerPesosUltimosDias(dias) {
 async function obtenerPesosUltimosMeses(meses) {
   const desde = new Date();
   desde.setMonth(desde.getMonth() - meses);
-  const fechaDesde = desde.toISOString().slice(0, 10);
+  const fechaDesde = fechaISOLocal(desde);
   return db.Registro_Peso
     .where('fecha')
     .aboveOrEqual(fechaDesde)
@@ -121,7 +154,7 @@ async function seedTestData(diasAtras = 60, pesoBase = 82.0) {
   for (let i = diasAtras; i >= 0; i--) {
     const d = new Date(hoyDate);
     d.setDate(d.getDate() - i);
-    const fecha = d.toISOString().slice(0, 10);
+    const fecha = fechaISOLocal(d);
 
     // Simula fluctuación realista: tendencia leve a la baja + ruido diario
     const tendencia = -0.02 * (diasAtras - i);
@@ -320,7 +353,6 @@ function calcularDeltaFatiga(anterior, actual) {
  */
 async function verificarRecordatorios() {
   const mensajes = [];
-  const hoyStr = hoy();
   const hoyDate = new Date();
 
   // ── Recordatorio 1: domingo previo al primer lunes del mes ──
@@ -408,45 +440,9 @@ async function obtenerTodasLasFotos() {
   return db.Fotos_Progreso.orderBy('fecha').toArray();
 }
 
-/**
- * Comprime una imagen antes de guardarla.
- * Máx 1200px en lado mayor, JPEG calidad 0.85.
- * @param {File} file
- * @returns {Promise<string>} base64 sin prefijo
- */
-function comprimirImagen(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1200;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) {
-            height = Math.round((height * MAX) / width);
-            width = MAX;
-          } else {
-            width = Math.round((width * MAX) / height);
-            height = MAX;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        // Extraer base64 sin el prefijo "data:image/jpeg;base64,"
-        const dataURL = canvas.toDataURL('image/jpeg', 0.85);
-        resolve(dataURL.split(',')[1]);
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+// Nota: la compresión de imágenes (máx 1200px, JPEG 0.85) la realiza el flujo
+// de recorte en app.js mediante cropper.getCroppedCanvas(). La antigua función
+// comprimirImagen() fue eliminada por quedar obsoleta.
 
 // ─────────────────────────────────────────────────────────
 //  AJUSTES
@@ -550,7 +546,7 @@ function mesAnterior(mesISO) {
 async function mediaMovilHastaMes(mesISO) {
   const [y, m] = mesISO.split('-').map(Number);
   const ultimoDia = new Date(y, m, 0); // último día del mes
-  const fechaHasta = ultimoDia.toISOString().slice(0, 10);
+  const fechaHasta = fechaISOLocal(ultimoDia);
 
   const registros = await db.Registro_Peso
     .where('fecha')
@@ -571,8 +567,8 @@ async function obtenerPesos3Meses(mesISO) {
   const [y, m] = mesISO.split('-').map(Number);
   const desde = new Date(y, m - 3, 1);
   const hasta = new Date(y, m, 0);
-  const fechaDesde = desde.toISOString().slice(0, 10);
-  const fechaHasta = hasta.toISOString().slice(0, 10);
+  const fechaDesde = fechaISOLocal(desde);
+  const fechaHasta = fechaISOLocal(hasta);
 
   return db.Registro_Peso
     .where('fecha')
