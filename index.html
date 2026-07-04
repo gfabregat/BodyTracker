@@ -121,7 +121,10 @@
     .cropper-modal { background: #0D0D0D; opacity: 0.8; }
     .cropper-view-box { outline-color: #C8F135; }
     .cropper-line, .cropper-point { background-color: #C8F135; }
-    .cropper-point { width: 10px; height: 10px; opacity: 1; }
+    /* Manijas grandes para uso táctil */
+    .cropper-point { width: 16px; height: 16px; opacity: 1; border-radius: 50%; }
+    .cropper-point.point-n, .cropper-point.point-s { margin-left: -8px; }
+    .cropper-point.point-e, .cropper-point.point-w { margin-top: -8px; }
   </style>
 </head>
 <body>
@@ -655,13 +658,13 @@
           <div>
             <p id="comparar-label-a" class="text-muted text-xs font-500 uppercase tracking-wider mb-2 text-center"></p>
             <div id="comparar-img-a" class="rounded-2xl overflow-hidden flex items-center justify-center"
-              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:3/4;">
+              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:1/2;">
             </div>
           </div>
           <div>
             <p id="comparar-label-b" class="text-muted text-xs font-500 uppercase tracking-wider mb-2 text-center"></p>
             <div id="comparar-img-b" class="rounded-2xl overflow-hidden flex items-center justify-center"
-              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:3/4;">
+              style="background:#1A1A1A; border:1px solid #2A2A2A; aspect-ratio:1/2;">
             </div>
           </div>
         </div>
@@ -739,8 +742,14 @@
       position:absolute; top:20px; right:20px;
       background:#1A1A1A; border:1px solid #2A2A2A;
       color:#F0F0F0; border-radius:50%; width:40px; height:40px;
-      font-size:20px; display:flex; align-items:center; justify-content:center;">✕</button>
+      font-size:20px; display:flex; align-items:center; justify-content:center; z-index:2;">✕</button>
     <img id="foto-expand-img" src="" alt="" style="max-width:95vw; max-height:85vh; object-fit:contain; border-radius:12px;" />
+    <div id="foto-expand-placeholder" style="
+      display:none; width:60vw; max-width:280px; aspect-ratio:1/2;
+      background:#1A1A1A; border:1px dashed #2A2A2A; border-radius:12px;
+      align-items:center; justify-content:center;">
+      <p class="text-muted text-sm">Sin foto</p>
+    </div>
     <p id="foto-expand-label" class="text-muted text-xs mt-3"></p>
   </div>
 
@@ -1097,7 +1106,7 @@
 
   <!-- Controles -->
   <div class="px-5 py-4 text-center" style="flex-shrink:0; border-top:1px solid #2A2A2A;">
-    <p class="text-muted text-xs mb-3">Arrastrá para mover · Pellizcá para ajustar el área</p>
+    <p class="text-muted text-xs mb-3">Arrastrá para mover la imagen · Usá las esquinas para ajustar el marco</p>
     <div class="flex justify-center gap-3">
       <button id="btn-crop-rotar" class="px-4 py-2 rounded-xl text-xs font-600"
         style="background:#1A1A1A; border:1px solid #2A2A2A; color:#6B6B6B;">

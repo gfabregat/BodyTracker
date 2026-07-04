@@ -1416,8 +1416,21 @@ async function renderGaleriaFotos() {
 }
 
 // ── Modal expandir foto ─────────────────────────────────
+// Dos modos:
+//  - Galería: una sola foto, sin swipe (compExpand = null)
+//  - Comparación: swipe horizontal alterna entre Mes A y Mes B (compExpand activo)
+
+const fotoExpandPlaceholder = document.getElementById('foto-expand-placeholder');
+
+let compExpand = null; // { pose, meses:[mesA,mesB], fotos:[srcA|null,srcB|null], idx:0|1 }
+let swipeStartX = null;
+let swipeStartY = null;
+let huboSwipe   = false; // evita que el touchend de un swipe dispare el click de cierre
 
 function abrirExpandModal(mes, pose) {
+  compExpand = null; // modo galería: sin swipe
+  fotoExpandImg.style.display = 'block';
+  fotoExpandPlaceholder.style.display = 'none';
   fotoExpandModal.style.display = 'flex';
   fotoExpandModal.classList.remove('hidden');
   fotoExpandLabel.textContent = `${formatearMes(mes)} — ${POSES_LABELS[pose]}`;
@@ -1426,19 +1439,94 @@ function abrirExpandModal(mes, pose) {
   if (imgEl) fotoExpandImg.src = imgEl.src;
 }
 
-fotoExpandCerrar.addEventListener('click', () => {
+/**
+ * Abre la vista expandida en modo comparación: carga las fotos de ambos
+ * meses para la pose actual y habilita el swipe horizontal para alternar.
+ * @param {string} mesTocado - el mes de la foto que se tocó (arranca mostrando esa)
+ */
+async function abrirExpandComparacion(mesTocado) {
+  const mesA = compararMesA.value;
+  const mesB = compararMesB.value;
+  const pose = comparadorPoseActual;
+
+  const [regA, regB] = await Promise.all([
+    obtenerFotosPorMes(mesA),
+    obtenerFotosPorMes(mesB),
+  ]);
+
+  const srcA = regA?.[pose] ? `data:image/jpeg;base64,${regA[pose]}` : null;
+  const srcB = regB?.[pose] ? `data:image/jpeg;base64,${regB[pose]}` : null;
+
+  compExpand = {
+    pose,
+    meses: [mesA, mesB],
+    fotos: [srcA, srcB],
+    idx: mesTocado === mesB ? 1 : 0,
+  };
+
+  renderExpandComparacion();
+  fotoExpandModal.style.display = 'flex';
+  fotoExpandModal.classList.remove('hidden');
+}
+
+function renderExpandComparacion() {
+  if (!compExpand) return;
+  const { pose, meses, fotos, idx } = compExpand;
+
+  const src = fotos[idx];
+  if (src) {
+    fotoExpandImg.src = src;
+    fotoExpandImg.style.display = 'block';
+    fotoExpandPlaceholder.style.display = 'none';
+  } else {
+    fotoExpandImg.src = '';
+    fotoExpandImg.style.display = 'none';
+    fotoExpandPlaceholder.style.display = 'flex';
+  }
+
+  const dots = idx === 0 ? '● ○' : '○ ●';
+  fotoExpandLabel.innerHTML =
+    `${formatearMes(meses[idx])} — ${POSES_LABELS[pose]}` +
+    ` &nbsp;<span style="color:#C8F135;">${dots}</span>&nbsp;` +
+    `<span style="color:#6B6B6B;">‹ deslizá para comparar ›</span>`;
+}
+
+function cerrarExpandModal() {
   fotoExpandModal.style.display = 'none';
   fotoExpandModal.classList.add('hidden');
   fotoExpandImg.src = '';
-});
+  fotoExpandImg.style.display = 'block';
+  fotoExpandPlaceholder.style.display = 'none';
+  compExpand = null;
+}
+
+fotoExpandCerrar.addEventListener('click', cerrarExpandModal);
 
 fotoExpandModal.addEventListener('click', (e) => {
-  if (e.target === fotoExpandModal) {
-    fotoExpandModal.style.display = 'none';
-    fotoExpandModal.classList.add('hidden');
-    fotoExpandImg.src = '';
-  }
+  if (huboSwipe) { huboSwipe = false; return; } // el swipe no debe cerrar el modal
+  if (e.target === fotoExpandModal) cerrarExpandModal();
 });
+
+// Detección de swipe horizontal (solo activo en modo comparación)
+fotoExpandModal.addEventListener('touchstart', (e) => {
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+fotoExpandModal.addEventListener('touchend', (e) => {
+  if (swipeStartX === null) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  swipeStartX = null;
+  swipeStartY = null;
+
+  // Umbral de 50px y predominio horizontal para no confundir con scroll/tap
+  if (compExpand && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    huboSwipe = true;
+    compExpand.idx = compExpand.idx === 0 ? 1 : 0;
+    renderExpandComparacion();
+  }
+}, { passive: true });
 
 // ── Subida de foto ──────────────────────────────────────
 
@@ -1568,9 +1656,12 @@ function abrirCropModal(imageSrc) {
     // Pequeño delay para que el layout flex del modal termine de calcular dimensiones
     setTimeout(() => {
       cropperInstance = new Cropper(cropImagen, {
-        viewMode: 2,        // La imagen cubre el contenedor sin dejar huecos, ajustando al área visible
-        autoCropArea: 0.95, // Área de crop inicial: 95% de la imagen
-        aspectRatio: NaN,   // Libre
+        viewMode: 1,               // El área de crop no puede salir de la imagen
+        dragMode: 'move',          // Arrastrar MUEVE la imagen (no crea áreas nuevas)
+        aspectRatio: 1 / 2,        // Proporción FIJA 1:2 (retrato alto) — decisión de producto:
+                                   // todas las fotos uniformes = comparativas mes a mes alineadas
+        autoCropArea: 1,           // Área inicial: la máxima posible dentro de la imagen
+        toggleDragModeOnDblclick: false, // Sin doble-tap que cambia de modo (confundía en móvil)
         movable: true,
         zoomable: true,
         rotatable: true,
@@ -1725,7 +1816,9 @@ async function renderComparacion() {
     if (reg && reg[pose]) {
       return `<img src="data:image/jpeg;base64,${reg[pose]}"
         alt="${POSES_LABELS[pose]}"
-        style="width:100%; height:100%; object-fit:cover; display:block;" />`;
+        class="comp-foto-tap cursor-pointer"
+        data-mes="${mes}"
+        style="width:100%; height:100%; object-fit:contain; display:block;" />`;
     }
     return `<div class="flex flex-col items-center justify-center gap-2 p-4" style="height:100%;">
       <p class="text-muted text-xs text-center">Sin foto</p>
@@ -1742,6 +1835,13 @@ async function renderComparacion() {
   document.querySelectorAll('.comp-agregar-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       iniciarSubidaFoto(btn.dataset.mes, btn.dataset.pose);
+    });
+  });
+
+  // Tap sobre una foto de la comparación → vista expandida con swipe entre meses
+  document.querySelectorAll('.comp-foto-tap').forEach(img => {
+    img.addEventListener('click', () => {
+      abrirExpandComparacion(img.dataset.mes);
     });
   });
 }
@@ -1998,20 +2098,20 @@ async function renderDashboard(mes) {
         <div>
           <p class="text-muted text-xs mb-2 text-center">${formatearMes(mes)}</p>
           <div class="rounded-xl overflow-hidden flex items-center justify-center"
-            style="aspect-ratio:3/4; background:#0D0D0D;">
+            style="aspect-ratio:1/2; background:#0D0D0D;">
             ${thumbActual
               ? `<img src="data:image/jpeg;base64,${fotosActual[thumbActual]}"
-                  style="width:100%; height:100%; object-fit:cover;" />`
+                  style="width:100%; height:100%; object-fit:contain;" />`
               : `<p class="text-muted text-xs">Sin foto</p>`}
           </div>
         </div>
         <div>
           <p class="text-muted text-xs mb-2 text-center">${formatearMes(mesAnt)}</p>
           <div class="rounded-xl overflow-hidden flex items-center justify-center"
-            style="aspect-ratio:3/4; background:#0D0D0D;">
+            style="aspect-ratio:1/2; background:#0D0D0D;">
             ${thumbAnterior
               ? `<img src="data:image/jpeg;base64,${fotosAnterior[thumbAnterior]}"
-                  style="width:100%; height:100%; object-fit:cover;" />`
+                  style="width:100%; height:100%; object-fit:contain;" />`
               : `<p class="text-muted text-xs">Sin foto</p>`}
           </div>
         </div>
