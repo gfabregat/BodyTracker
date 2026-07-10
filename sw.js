@@ -5,7 +5,7 @@
 //  Las operaciones de datos van directo a IndexedDB, sin cache aquí.
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'body-tracker-v8';
+const CACHE_NAME = 'body-tracker-v9';
 
 // Assets que se cachean en la instalación del SW.
 // IMPORTANTE: rutas RELATIVAS ('./'), que se resuelven contra el scope del SW

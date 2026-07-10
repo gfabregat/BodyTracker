@@ -556,22 +556,46 @@ function renderMacrosHistorial(registros) {
 
 // ── Formulario ──────────────────────────────────────────
 
-function abrirFormMacroNueva() {
+const btnCopiarUltimoMacro = document.getElementById('btn-copiar-ultimo-macro');
+let ultimoMacroRegistro = null; // cache del último registro para "copiar"
+
+async function abrirFormMacroNueva() {
   macrosEditandoFecha = null;
   macrosFormTitulo.textContent = 'Registrar macros';
   inputMacrosFecha.value    = hoy();
+  inputMacrosFecha.disabled = false;
   inputMacrosProteina.value = '';
   inputMacrosCarbos.value   = '';
   inputMacrosGrasas.value   = '';
+
+  // Botón "copiar último": solo si existe algún registro previo con datos
+  const todas = await obtenerTodasLasMacros();
+  ultimoMacroRegistro = todas.length ? todas[todas.length - 1] : null;
+  if (ultimoMacroRegistro) {
+    btnCopiarUltimoMacro.classList.remove('hidden');
+  } else {
+    btnCopiarUltimoMacro.classList.add('hidden');
+  }
+
   macrosFormContainer.classList.remove('hidden');
   macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   setTimeout(() => inputMacrosProteina.focus(), 300);
 }
 
+// Copiar los valores del último registro al formulario (no toca la fecha)
+btnCopiarUltimoMacro.addEventListener('click', () => {
+  if (!ultimoMacroRegistro) return;
+  inputMacrosProteina.value = ultimoMacroRegistro.proteina ?? '';
+  inputMacrosCarbos.value   = ultimoMacroRegistro.carbos   ?? '';
+  inputMacrosGrasas.value   = ultimoMacroRegistro.grasas   ?? '';
+  mostrarToast(`⧉ Copiado de ${formatearFecha(ultimoMacroRegistro.fecha)}`, '#C8F135');
+});
+
 async function abrirFormMacroEdicion(fecha) {
   const reg = await obtenerMacrosPorFecha(fecha);
   if (!reg) return;
   macrosEditandoFecha = fecha;
+  btnCopiarUltimoMacro.classList.add('hidden'); // sin "copiar" en modo edición
   macrosFormTitulo.textContent = 'Editar — ' + formatearFecha(fecha);
   inputMacrosFecha.value    = fecha;
   inputMacrosFecha.disabled = true; // No cambiar la fecha al editar
@@ -1015,17 +1039,80 @@ inputCiFatigaActiva.addEventListener('change', () => {
 async function initCheckinScreen() {
   ciMesLabel.textContent = formatearMes(mesActual());
 
-  // Recordatorios
-  const mensajes = await verificarRecordatorios();
-  if (mensajes.length > 0) {
-    ciBannerTexto.textContent = mensajes[0];
-    ciBanner.classList.remove('hidden');
-  } else {
-    ciBanner.classList.add('hidden');
-  }
+  // El banner local de Check-in queda oculto: los recordatorios ahora se muestran
+  // globalmente al abrir la app (Fase A). Se conserva el elemento por compatibilidad.
+  ciBanner.classList.add('hidden');
 
+  await renderRitualWidget();
   await renderCheckinUI();
 }
+
+/**
+ * Renderiza el widget "ritual del mes": estado de cada módulo del mes en curso.
+ * Cada fila es tappeable y navega a la pestaña correspondiente.
+ */
+async function renderRitualWidget() {
+  const mes = mesActual();
+  document.getElementById('ritual-mes-label').textContent = formatearMes(mes);
+
+  const [medicion, checkin, fotos, macrosMes] = await Promise.all([
+    obtenerMedicionPorMes(mes),
+    obtenerCheckinPorMes(mes),
+    obtenerFotosPorMes(mes),
+    obtenerMacrosPorMes(mes),
+  ]);
+
+  const elMed    = document.getElementById('ritual-medidas');
+  const elChk    = document.getElementById('ritual-checkin');
+  const elFotos  = document.getElementById('ritual-fotos');
+  const elMacros = document.getElementById('ritual-macros');
+
+  // Medidas: check si existe registro del mes
+  if (medicion) {
+    elMed.textContent = '✓';
+    elMed.style.color = '#C8F135';
+  } else {
+    elMed.textContent = 'Pendiente';
+    elMed.style.color = '#6B6B6B';
+  }
+
+  // Check-in: check si existe
+  if (checkin) {
+    elChk.textContent = '✓';
+    elChk.style.color = '#C8F135';
+  } else {
+    elChk.textContent = 'Pendiente';
+    elChk.style.color = '#6B6B6B';
+  }
+
+  // Fotos: cuántas poses cargadas de 4
+  const nFotos = fotos ? POSES.filter(p => fotos[p]).length : 0;
+  if (nFotos === 4) {
+    elFotos.textContent = '✓ 4/4';
+    elFotos.style.color = '#C8F135';
+  } else if (nFotos > 0) {
+    elFotos.textContent = `${nFotos}/4`;
+    elFotos.style.color = '#FFB347';
+  } else {
+    elFotos.textContent = 'Pendiente';
+    elFotos.style.color = '#6B6B6B';
+  }
+
+  // Macros: cuántos días registrados en el mes
+  const nMacros = macrosMes.length;
+  if (nMacros > 0) {
+    elMacros.textContent = `${nMacros} ${nMacros === 1 ? 'día' : 'días'}`;
+    elMacros.style.color = '#C8F135';
+  } else {
+    elMacros.textContent = 'Sin datos';
+    elMacros.style.color = '#6B6B6B';
+  }
+}
+
+// Navegación desde el widget del ritual
+document.querySelectorAll('.ritual-item').forEach(item => {
+  item.addEventListener('click', () => navegarA(item.dataset.tab));
+});
 
 async function renderCheckinUI() {
   const todos = await obtenerTodosLosCheckins(); // ASC
@@ -1407,13 +1494,43 @@ async function renderGaleriaFotos() {
 
   // Listeners: eliminar foto
   document.querySelectorAll('.foto-eliminar-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      await eliminarFoto(btn.dataset.mes, btn.dataset.pose);
-      await renderGaleriaFotos();
+      pedirConfirmacionEliminarFoto(btn.dataset.mes, btn.dataset.pose);
     });
   });
 }
+
+// ── Confirmación de eliminación de foto ─────────────────
+
+const fotoDeleteModal      = document.getElementById('foto-delete-modal');
+const fotoDeleteInfo       = document.getElementById('foto-delete-info');
+const btnFotoDeleteCancelar = document.getElementById('btn-foto-delete-cancelar');
+const btnFotoDeleteConfirmar = document.getElementById('btn-foto-delete-confirmar');
+let fotoAEliminar = null; // { mes, pose }
+
+function pedirConfirmacionEliminarFoto(mes, pose) {
+  fotoAEliminar = { mes, pose };
+  fotoDeleteInfo.textContent = `${POSES_LABELS[pose]} · ${formatearMes(mes)}. Esta acción no se puede deshacer.`;
+  fotoDeleteModal.style.display = 'flex';
+  fotoDeleteModal.classList.remove('hidden');
+}
+
+btnFotoDeleteCancelar.addEventListener('click', () => {
+  fotoDeleteModal.style.display = 'none';
+  fotoDeleteModal.classList.add('hidden');
+  fotoAEliminar = null;
+});
+
+btnFotoDeleteConfirmar.addEventListener('click', async () => {
+  if (!fotoAEliminar) return;
+  await eliminarFoto(fotoAEliminar.mes, fotoAEliminar.pose);
+  fotoDeleteModal.style.display = 'none';
+  fotoDeleteModal.classList.add('hidden');
+  fotoAEliminar = null;
+  await renderGaleriaFotos();
+  mostrarToast('Foto eliminada', '#6B6B6B');
+});
 
 // ── Modal expandir foto ─────────────────────────────────
 // Dos modos:
@@ -2420,6 +2537,7 @@ btnExportarJSON.addEventListener('click', async () => {
     a.download = `bodytracker-backup-${fecha}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    registrarBackupExportado();
     mostrarToast('✓ Backup descargado', '#C8F135');
   } catch (err) {
     console.error('[Export] Error:', err);

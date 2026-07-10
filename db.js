@@ -351,6 +351,9 @@ function calcularDeltaFatiga(anterior, actual) {
  * Verifica si hay que mostrar banners de recordatorio al abrir la app.
  * Devuelve un array de mensajes a mostrar (puede ser vacío).
  */
+// Clave de localStorage con la fecha ISO del último backup exportado
+const BACKUP_KEY = 'bodytracker_ultimo_backup';
+
 async function verificarRecordatorios() {
   const mensajes = [];
   const hoyDate = new Date();
@@ -386,7 +389,30 @@ async function verificarRecordatorios() {
     }
   }
 
+  // ── Recordatorio 3: 30+ días sin exportar backup ──
+  // Solo aplica si hay datos que valga la pena respaldar.
+  if (ultimosPesos.length > 0) {
+    const ultimoBackup = localStorage.getItem(BACKUP_KEY);
+    if (ultimoBackup) {
+      const diasSinBackup = Math.floor((hoyDate - new Date(ultimoBackup)) / (1000 * 60 * 60 * 24));
+      if (diasSinBackup >= 30) {
+        mensajes.push(`💾 Hace ${diasSinBackup} días que no exportás un backup. Tus datos viven solo en este dispositivo — exportá uno desde Ajustes.`);
+      }
+    } else {
+      // Nunca exportó: registramos "ahora" como punto de partida para no molestar de inmediato
+      localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+    }
+  }
+
   return mensajes;
+}
+
+/**
+ * Registra el momento del último backup exportado.
+ * Se llama al exportar JSON exitosamente.
+ */
+function registrarBackupExportado() {
+  localStorage.setItem(BACKUP_KEY, new Date().toISOString());
 }
 
 // ─────────────────────────────────────────────────────────
