@@ -372,14 +372,24 @@
     <!-- Header -->
     <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
       <div>
-        <p id="med-mes-label" class="text-muted text-xs font-medium uppercase tracking-widest"></p>
+        <p class="text-muted text-xs font-medium uppercase tracking-widest">Composición</p>
         <h1 class="text-text text-xl font-700 leading-tight">Mediciones</h1>
       </div>
-      <button id="btn-nueva-medicion"
-        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
-        style="background:#C8F135; color:#0D0D0D; min-height:40px;">
-        + Nueva
-      </button>
+      <div class="flex items-center gap-2">
+        <select id="med-mes-selector"
+          class="text-sm font-600"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;
+                 min-width:120px; height:40px; padding:0 28px 0 10px; border-radius:12px;
+                 -webkit-appearance:none; appearance:none;
+                 background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B6B%22 stroke-width=%223%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                 background-repeat:no-repeat; background-position:right 10px center;">
+        </select>
+        <button id="btn-nueva-medicion"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+          style="background:#C8F135; color:#0D0D0D; min-height:40px; white-space:nowrap;">
+          + Nueva
+        </button>
+      </div>
     </header>
 
     <!-- Contenido scrolleable -->
@@ -488,14 +498,24 @@
     <!-- Header -->
     <header class="flex items-center justify-between px-5 pt-5 pb-3" style="flex-shrink:0;">
       <div>
-        <p id="ci-mes-label" class="text-muted text-xs font-medium uppercase tracking-widest"></p>
+        <p class="text-muted text-xs font-medium uppercase tracking-widest">Rendimiento</p>
         <h1 class="text-text text-xl font-700 leading-tight">Check-in</h1>
       </div>
-      <button id="btn-nuevo-checkin"
-        class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
-        style="background:#C8F135; color:#0D0D0D; min-height:40px;">
-        + Nuevo
-      </button>
+      <div class="flex items-center gap-2">
+        <select id="ci-mes-selector"
+          class="text-sm font-600"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;
+                 min-width:120px; height:40px; padding:0 28px 0 10px; border-radius:12px;
+                 -webkit-appearance:none; appearance:none;
+                 background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B6B%22 stroke-width=%223%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                 background-repeat:no-repeat; background-position:right 10px center;">
+        </select>
+        <button id="btn-nuevo-checkin"
+          class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
+          style="background:#C8F135; color:#0D0D0D; min-height:40px; white-space:nowrap;">
+          + Nuevo
+        </button>
+      </div>
     </header>
 
     <!-- Contenido scrolleable -->

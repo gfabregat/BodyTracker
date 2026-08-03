@@ -684,7 +684,7 @@ let medEditandoMes = null; // null = nueva, 'YYYY-MM' = editando
 
 const medFormContainer  = document.getElementById('med-form-container');
 const medFormTitulo     = document.getElementById('med-form-titulo');
-const medMesLabel       = document.getElementById('med-mes-label');
+const medMesSelector    = document.getElementById('med-mes-selector');
 const btnNuevaMedicion  = document.getElementById('btn-nueva-medicion');
 const btnMedGuardar     = document.getElementById('btn-med-guardar');
 const btnMedCancelar    = document.getElementById('btn-med-cancelar');
@@ -699,10 +699,44 @@ const medHistorialEmpty = document.getElementById('med-historial-empty');
 const medChartEmpty     = document.getElementById('med-chart-empty');
 const medVarBtns        = document.querySelectorAll('.med-var-btn');
 
+let medMesActivo = mesActual(); // mes sobre el que opera el botón +Nueva/Editar
+
 async function initMedicionesScreen() {
-  medMesLabel.textContent = formatearMes(mesActual());
+  medMesActivo = mesActual(); // al abrir, siempre el mes en curso
+  await poblarSelectorMesesMediciones();
+  medMesSelector.value = medMesActivo;
   await renderMedicionesUI();
 }
+
+/**
+ * Puebla el selector con los meses que tienen medición + los últimos 12 meses,
+ * para poder cargar retroactivamente aunque no exista registro previo.
+ */
+async function poblarSelectorMesesMediciones() {
+  const todas = await obtenerTodasLasMediciones();
+  const mesesSet = new Set();
+  todas.forEach(r => mesesSet.add(r.fecha));
+
+  // Agregar mes actual + 11 anteriores para permitir carga retroactiva
+  const [y, m] = mesActual().split('-').map(Number);
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    mesesSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const meses = [...mesesSet].sort().reverse();
+  const previo = medMesActivo;
+  medMesSelector.innerHTML = meses.map(mm => {
+    const tiene = todas.some(r => r.fecha === mm);
+    return `<option value="${mm}">${formatearMes(mm)}${tiene ? ' ✓' : ''}</option>`;
+  }).join('');
+  medMesSelector.value = meses.includes(previo) ? previo : mesActual();
+}
+
+medMesSelector.addEventListener('change', () => {
+  medMesActivo = medMesSelector.value;
+  actualizarBotonMedicion();
+});
 
 async function renderMedicionesUI() {
   const todas = await obtenerTodasLasMediciones(); // ordenadas ASC
@@ -711,9 +745,15 @@ async function renderMedicionesUI() {
   renderHistorialCompleto(todas);
   await actualizarGraficoMediciones(todas);
 
-  // Mostrar/ocultar botón Nueva según si ya existe registro este mes
-  const hayMesActual = todas.some(m => m.fecha === mesActual());
-  btnNuevaMedicion.textContent = hayMesActual ? '✎ Editar' : '+ Nueva';
+  await actualizarBotonMedicion();
+}
+
+/**
+ * Ajusta el texto del botón según si el mes activo ya tiene medición.
+ */
+async function actualizarBotonMedicion() {
+  const reg = await obtenerMedicionPorMes(medMesActivo);
+  btnNuevaMedicion.textContent = reg ? '✎ Editar' : '+ Nueva';
 }
 
 // ── Mini tabla (últimos 3) ──────────────────────────────
@@ -956,8 +996,8 @@ medVarBtns.forEach(btn => {
 // ── Formulario ──────────────────────────────────────────
 
 function abrirFormNueva() {
-  medEditandoMes = null;
-  medFormTitulo.textContent = 'Nueva medición — ' + formatearMes(mesActual());
+  medEditandoMes = medMesActivo;
+  medFormTitulo.textContent = 'Nueva medición — ' + formatearMes(medMesActivo);
   inputCintura.value = '';
   inputBrazoRel.value = '';
   inputBrazoCont.value = '';
@@ -998,7 +1038,14 @@ function validarInputMedicion(input, label) {
   return v;
 }
 
-btnNuevaMedicion.addEventListener('click', abrirFormNueva);
+btnNuevaMedicion.addEventListener('click', async () => {
+  const reg = await obtenerMedicionPorMes(medMesActivo);
+  if (reg) {
+    abrirFormEdicion(medMesActivo);
+  } else {
+    abrirFormNueva();
+  }
+});
 btnMedCancelar.addEventListener('click', cerrarForm);
 
 btnMedGuardar.addEventListener('click', async () => {
@@ -1016,10 +1063,12 @@ btnMedGuardar.addEventListener('click', async () => {
     return;
   }
 
-  const mes = medEditandoMes || mesActual();
+  const mes = medEditandoMes || medMesActivo;
   await guardarMedicion(mes, { cintura, brazoRelajado: brazoRel, brazoCont, muslo });
 
   cerrarForm();
+  await poblarSelectorMesesMediciones();
+  medMesSelector.value = medMesActivo;
   await renderMedicionesUI();
   mostrarToast('✓ Medición guardada', '#C8F135');
 });
@@ -1028,7 +1077,7 @@ btnMedGuardar.addEventListener('click', async () => {
 //  PANTALLA DE CHECK-IN
 // ─────────────────────────────────────────────────────────
 
-const ciMesLabel          = document.getElementById('ci-mes-label');
+const ciMesSelector       = document.getElementById('ci-mes-selector');
 const ciBanner            = document.getElementById('ci-banner');
 const ciBannerTexto       = document.getElementById('ci-banner-texto');
 const ciFormContainer     = document.getElementById('ci-form-container');
@@ -1069,16 +1118,49 @@ inputCiFatigaActiva.addEventListener('change', () => {
   ciFatigaValor.style.color = inputCiFatigaActiva.checked ? '#C8F135' : '#6B6B6B';
 });
 
-async function initCheckinScreen() {
-  ciMesLabel.textContent = formatearMes(mesActual());
+let ciMesActivo = mesActual(); // mes que se visualiza/edita en check-in
 
+async function initCheckinScreen() {
   // El banner local de Check-in queda oculto: los recordatorios ahora se muestran
   // globalmente al abrir la app (Fase A). Se conserva el elemento por compatibilidad.
   ciBanner.classList.add('hidden');
 
-  await renderRitualWidget();
+  ciMesActivo = mesActual(); // al abrir, siempre el mes en curso
+  await poblarSelectorMesesCheckin();
+  ciMesSelector.value = ciMesActivo;
+
+  await renderRitualWidget(); // el ritual SIEMPRE refleja el mes actual
   await renderCheckinUI();
 }
+
+/**
+ * Puebla el selector con los meses que tienen check-in + los últimos 12 meses,
+ * para permitir carga retroactiva.
+ */
+async function poblarSelectorMesesCheckin() {
+  const todos = await obtenerTodosLosCheckins();
+  const mesesSet = new Set();
+  todos.forEach(r => mesesSet.add(r.fecha));
+
+  const [y, m] = mesActual().split('-').map(Number);
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    mesesSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const meses = [...mesesSet].sort().reverse();
+  const previo = ciMesActivo;
+  ciMesSelector.innerHTML = meses.map(mm => {
+    const tiene = todos.some(r => r.fecha === mm);
+    return `<option value="${mm}">${formatearMes(mm)}${tiene ? ' ✓' : ''}</option>`;
+  }).join('');
+  ciMesSelector.value = meses.includes(previo) ? previo : mesActual();
+}
+
+ciMesSelector.addEventListener('change', async () => {
+  ciMesActivo = ciMesSelector.value;
+  await renderCheckinUI();
+});
 
 /**
  * Renderiza el widget "ritual del mes": estado de cada módulo del mes en curso.
@@ -1149,21 +1231,21 @@ document.querySelectorAll('.ritual-item').forEach(item => {
 
 async function renderCheckinUI() {
   const todos = await obtenerTodosLosCheckins(); // ASC
-  const checkinMesActual = await obtenerCheckinPorMes(mesActual());
+  const checkinMesActivo = await obtenerCheckinPorMes(ciMesActivo);
 
-  // Botón header
-  btnNuevoCheckin.textContent = checkinMesActual ? '✎ Editar' : '+ Nuevo';
+  // Botón header: nuevo o editar según el mes seleccionado
+  btnNuevoCheckin.textContent = checkinMesActivo ? '✎ Editar' : '+ Nuevo';
 
-  // Resumen mes actual
-  if (checkinMesActual) {
+  // Resumen del mes seleccionado
+  if (checkinMesActivo) {
     ciResumenContainer.classList.remove('hidden');
-    renderResumenCheckin(checkinMesActual, todos);
+    renderResumenCheckin(checkinMesActivo, todos);
   } else {
     ciResumenContainer.classList.add('hidden');
   }
 
-  // Historial (todos excepto el mes actual, invertido)
-  const historial = todos.filter(c => c.fecha !== mesActual()).reverse();
+  // Historial (todos excepto el mes seleccionado, invertido)
+  const historial = todos.filter(c => c.fecha !== ciMesActivo).reverse();
   renderHistorialCheckin(historial, todos);
 }
 
@@ -1310,8 +1392,8 @@ function renderHistorialCheckin(historial, todos) {
 // ── Formulario check-in ─────────────────────────────────
 
 function abrirFormCheckinNuevo() {
-  ciEditandoMes = null;
-  ciFormTitulo.textContent = 'Check-in — ' + formatearMes(mesActual());
+  ciEditandoMes = ciMesActivo;
+  ciFormTitulo.textContent = 'Check-in — ' + formatearMes(ciMesActivo);
   inputCiBanca.value     = '';
   inputCiDominadas.value = '';
   inputCiRdl.value       = '';
@@ -1371,7 +1453,14 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;');
 }
 
-btnNuevoCheckin.addEventListener('click', abrirFormCheckinNuevo);
+btnNuevoCheckin.addEventListener('click', async () => {
+  const reg = await obtenerCheckinPorMes(ciMesActivo);
+  if (reg) {
+    abrirFormCheckinEdicion(ciMesActivo);
+  } else {
+    abrirFormCheckinNuevo();
+  }
+});
 btnCiCancelar.addEventListener('click', cerrarFormCheckin);
 
 btnCiGuardar.addEventListener('click', async () => {
@@ -1389,10 +1478,14 @@ btnCiGuardar.addEventListener('click', async () => {
     return;
   }
 
-  const mes = ciEditandoMes || mesActual();
+  const mes = ciEditandoMes || ciMesActivo;
   await guardarCheckin(mes, { banca, dominadas, rdl, fatiga, pasos, notas });
 
   cerrarFormCheckin();
+  ciMesActivo = mes;
+  await poblarSelectorMesesCheckin();
+  ciMesSelector.value = ciMesActivo;
+  await renderRitualWidget(); // por si se completó el check-in del mes actual
   await renderCheckinUI();
   mostrarDashboardBadge();
   mostrarToast('✓ Check-in guardado', '#C8F135');
