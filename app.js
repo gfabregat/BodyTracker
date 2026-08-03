@@ -446,7 +446,7 @@ btnResetZoom.addEventListener('click', () => {
 //  PANTALLA DE MACROS
 // ─────────────────────────────────────────────────────────
 
-const macrosMesLabel       = document.getElementById('macros-mes-label');
+const macrosMesSelector    = document.getElementById('macros-mes-selector');
 const macrosPromedio       = document.getElementById('macros-promedio');
 const macrosFormContainer  = document.getElementById('macros-form-container');
 const macrosFormTitulo     = document.getElementById('macros-form-titulo');
@@ -461,15 +461,42 @@ const inputMacrosCarbos    = document.getElementById('macros-carbos');
 const inputMacrosGrasas    = document.getElementById('macros-grasas');
 
 let macrosEditandoFecha = null; // null = nueva, 'YYYY-MM-DD' = editando
+let macrosMesActivo = mesActual(); // mes que se está visualizando
 
 async function initMacrosScreen() {
-  macrosMesLabel.textContent = formatearMes(mesActual());
+  await poblarSelectorMesesMacros();
+  macrosMesActivo = macrosMesSelector.value || mesActual();
   await renderMacrosUI();
 }
 
+/**
+ * Puebla el selector con todos los meses que tienen registros de macros,
+ * más el mes actual siempre. Ordenados del más reciente al más antiguo.
+ */
+async function poblarSelectorMesesMacros() {
+  const todas = await obtenerTodasLasMacros();
+  const mesesSet = new Set();
+  todas.forEach(r => mesesSet.add(r.fecha.slice(0, 7)));
+  mesesSet.add(mesActual());
+
+  const meses = [...mesesSet].sort().reverse();
+
+  // Preservar la selección actual si sigue existiendo
+  const previo = macrosMesActivo;
+  macrosMesSelector.innerHTML = meses.map(m =>
+    `<option value="${m}">${formatearMes(m)}</option>`
+  ).join('');
+  macrosMesSelector.value = meses.includes(previo) ? previo : (meses[0] || mesActual());
+}
+
+macrosMesSelector.addEventListener('change', async () => {
+  macrosMesActivo = macrosMesSelector.value;
+  await renderMacrosUI();
+});
+
 async function renderMacrosUI() {
-  const registros = await obtenerMacrosPorMes(mesActual());
-  const promedio  = await calcularPromedioMacrosMes(mesActual());
+  const registros = await obtenerMacrosPorMes(macrosMesActivo);
+  const promedio  = await calcularPromedioMacrosMes(macrosMesActivo);
 
   renderMacrosPromedio(promedio);
   renderMacrosHistorial(registros);
@@ -548,6 +575,7 @@ function renderMacrosHistorial(registros) {
   document.querySelectorAll('.macro-eliminar-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       await eliminarMacros(btn.dataset.fecha);
+      await poblarSelectorMesesMacros();
       await renderMacrosUI();
       mostrarToast('Registro eliminado', '#6B6B6B');
     });
@@ -637,6 +665,11 @@ btnMacrosGuardar.addEventListener('click', async () => {
 
   await guardarMacros(fecha, { proteina, carbos, grasas });
   cerrarFormMacros();
+
+  // Saltar la vista al mes del registro guardado (por si era de otro mes)
+  macrosMesActivo = fecha.slice(0, 7);
+  await poblarSelectorMesesMacros();
+  macrosMesSelector.value = macrosMesActivo;
   await renderMacrosUI();
   mostrarToast('✓ Macros guardadas', '#C8F135');
 });
