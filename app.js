@@ -41,7 +41,7 @@ function navegarA(tab) {
 
   // Si vamos a macros, refrescar
   if (tab === 'macros') {
-    initMacrosScreen();
+    initMacrosScreen().catch(err => console.error('[macros] init:', err));
   }
 
   // Si vamos a mediciones, refrescar

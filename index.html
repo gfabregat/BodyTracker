@@ -114,6 +114,12 @@
     /* Scrollbar invisible */
     ::-webkit-scrollbar { width: 0; }
 
+    /* Opciones de los <select> — fondo oscuro y texto claro en el desplegable */
+    select option {
+      background-color: #1A1A1A;
+      color: #F0F0F0;
+    }
+
     /* Cropper overrides — fondo oscuro */
     /* El contenedor #crop-area (flex-1) define el espacio; Cropper se ajusta a él */
     #crop-area .cropper-container { max-width: 100% !important; max-height: 100% !important; }
@@ -256,8 +262,12 @@
       </div>
       <div class="flex items-center gap-2">
         <select id="macros-mes-selector"
-          class="px-3 py-2 rounded-xl text-sm font-600"
-          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none; max-width:140px;">
+          class="text-sm font-600"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;
+                 min-width:120px; height:40px; padding:0 10px; border-radius:12px;
+                 -webkit-appearance:none; appearance:none;
+                 background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B6B%22 stroke-width=%223%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                 background-repeat:no-repeat; background-position:right 10px center; padding-right:28px;">
         </select>
         <button id="btn-nueva-macro"
           class="px-4 py-2 rounded-xl text-sm font-600 transition-all active:scale-95"
@@ -811,8 +821,12 @@
           📋 Informe
         </button>
         <select id="dash-mes-selector"
-          class="px-3 py-2 rounded-xl text-sm font-600"
-          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none; max-width:145px;">
+          class="text-sm font-600"
+          style="background:#1A1A1A; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;
+                 min-width:120px; max-width:150px; height:40px; padding:0 28px 0 10px; border-radius:12px;
+                 -webkit-appearance:none; appearance:none;
+                 background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B6B%22 stroke-width=%223%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                 background-repeat:no-repeat; background-position:right 10px center;">
         </select>
       </div>
     </header>
