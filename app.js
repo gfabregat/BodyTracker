@@ -303,7 +303,7 @@ async function actualizarGrafico() {
       datasets: [
         {
           // Dataset 0: Media móvil (protagonista)
-          label: 'Media 7 días',
+          label: 'Media 14 días',
           data: mediasMovil,
           borderColor: COLOR_MEDIA,
           borderWidth: 2.5,
@@ -2381,13 +2381,13 @@ async function generarInformeMarkdown(mes) {
   // ── Peso ──────────────────────────────────────────────
   lineas.push('## PESO');
   if (mediaActual !== null) {
-    lineas.push(`- **Media 7 días (este mes):** ${mediaActual.toFixed(1)} kg`);
+    lineas.push(`- **Media 14 días (este mes):** ${mediaActual.toFixed(1)} kg`);
     if (mediaAnterior !== null) {
       const diff = +(mediaActual - mediaAnterior).toFixed(1);
-      lineas.push(`- **Media 7 días (mes anterior):** ${mediaAnterior.toFixed(1)} kg`);
+      lineas.push(`- **Media 14 días (mes anterior):** ${mediaAnterior.toFixed(1)} kg`);
       lineas.push(`- **Delta:** ${signo(diff)} kg ${flechaTexto(diff, 0.3)}`);
     } else {
-      lineas.push(`- **Media 7 días (mes anterior):** Sin datos`);
+      lineas.push(`- **Media 14 días (mes anterior):** Sin datos`);
     }
   } else {
     lineas.push(`- Sin registros de peso para este mes.`);

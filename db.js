@@ -42,10 +42,10 @@ function hoy() {
  * Calcula la media aritmética de los últimos N registros disponibles.
  * "Disponibles" = los que existen en DB, sin importar si son días consecutivos.
  * @param {string} fechaHasta  - incluye este registro (YYYY-MM-DD)
- * @param {number} n           - ventana (7 por defecto)
+ * @param {number} n           - ventana (14 por defecto)
  * @returns {number|null}      - media redondeada a 2 decimales, o null si no hay datos
  */
-async function calcularMediaMovil(fechaHasta, n = 7) {
+async function calcularMediaMovil(fechaHasta, n = 14) {
   const registros = await db.Registro_Peso
     .where('fecha')
     .belowOrEqual(fechaHasta)
@@ -68,7 +68,7 @@ async function calcularMediaMovil(fechaHasta, n = 7) {
  */
 async function guardarPeso(fecha, peso) {
   await db.Registro_Peso.put({ fecha, peso, mediaMovil: null });
-  const mediaMovil = await calcularMediaMovil(fecha, 7);
+  const mediaMovil = await calcularMediaMovil(fecha, 14);
   await db.Registro_Peso.update(fecha, { mediaMovil });
 }
 
@@ -79,18 +79,20 @@ async function guardarPeso(fecha, peso) {
  * Se ejecuta al iniciar la app; el flag en localStorage evita repetirla.
  */
 async function migrarMediasMoviles() {
-  const FLAG = 'bodytracker_migracion_medias_v1';
+  // Flag v2: fuerza el recálculo cuando la ventana de la media cambió de 7 a 14 días.
+  // (Las medias guardadas con la ventana anterior quedan obsoletas y hay que recalcularlas.)
+  const FLAG = 'bodytracker_migracion_medias_v2';
   if (localStorage.getItem(FLAG)) return;
 
   const pesos = await db.Registro_Peso.orderBy('fecha').toArray();
   for (const r of pesos) {
-    const mediaMovil = await calcularMediaMovil(r.fecha, 7);
+    const mediaMovil = await calcularMediaMovil(r.fecha, 14);
     await db.Registro_Peso.update(r.fecha, { mediaMovil });
   }
 
   localStorage.setItem(FLAG, '1');
   if (pesos.length) {
-    console.log(`[migración] Medias móviles recalculadas para ${pesos.length} registros.`);
+    console.log(`[migración] Medias móviles (14 días) recalculadas para ${pesos.length} registros.`);
   }
 }
 
@@ -567,7 +569,7 @@ function mesAnterior(mesISO) {
 }
 
 /**
- * Calcula la media de los últimos 7 registros de peso hasta un mes dado.
+ * Calcula la media de los últimos 14 registros de peso hasta un mes dado.
  */
 async function mediaMovilHastaMes(mesISO) {
   const [y, m] = mesISO.split('-').map(Number);
@@ -578,7 +580,7 @@ async function mediaMovilHastaMes(mesISO) {
     .where('fecha')
     .belowOrEqual(fechaHasta)
     .reverse()
-    .limit(7)
+    .limit(14)
     .toArray();
 
   if (!registros.length) return null;
