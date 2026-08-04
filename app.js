@@ -2111,6 +2111,154 @@ fotoPoseBtns.forEach(btn => {
 btnCompararFotos.addEventListener('click', mostrarVistaComparar);
 btnCerrarComparar.addEventListener('click', mostrarVistaGaleria);
 
+// ── Descargar comparativa (4 poses, Mes A vs Mes B) ─────
+
+const btnDescargarComparativa = document.getElementById('btn-descargar-comparativa');
+
+/**
+ * Carga una imagen base64 en un objeto Image (promesa).
+ * Devuelve null si no hay src.
+ */
+function cargarImagen(base64) {
+  return new Promise((resolve) => {
+    if (!base64) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = `data:image/jpeg;base64,${base64}`;
+  });
+}
+
+btnDescargarComparativa.addEventListener('click', async () => {
+  const mesA = compararMesA.value;
+  const mesB = compararMesB.value;
+
+  if (!mesA || !mesB) {
+    mostrarToast('Elegí dos meses para comparar', '#FF4D4D');
+    return;
+  }
+
+  btnDescargarComparativa.textContent = 'Generando...';
+  btnDescargarComparativa.style.opacity = '0.6';
+
+  try {
+    const [regA, regB] = await Promise.all([
+      obtenerFotosPorMes(mesA),
+      obtenerFotosPorMes(mesB),
+    ]);
+
+    // ── Layout de la imagen ──
+    // Cada celda de foto: 300x600 (proporción 1:2). Dos columnas (A y B) por pose.
+    // 4 poses en 2 filas x 2 poses = grilla de 4 columnas (A,B,A,B) x 2 filas.
+    const CELL_W = 300, CELL_H = 600;
+    const GAP = 12;
+    const LABEL_H = 34;       // banda de etiqueta de mes sobre cada foto
+    const POSE_LABEL_H = 40;  // título de pose sobre cada par
+    const PAD = 24;
+    const HEADER_H = 70;      // título general arriba
+
+    // 2 poses por fila → ancho = 2 pares * (2 celdas + gap interno) + gaps
+    const PAIR_W = CELL_W * 2 + GAP;            // ancho de un par A|B
+    const COLS = 2;                              // 2 pares por fila
+    const totalW = PAD * 2 + PAIR_W * COLS + GAP;
+    const ROW_H = POSE_LABEL_H + LABEL_H + CELL_H;
+    const ROWS = 2;
+    const totalH = HEADER_H + PAD + ROW_H * ROWS + GAP + PAD;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = totalW;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    // Fondo
+    ctx.fillStyle = '#0D0D0D';
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // Título general
+    ctx.fillStyle = '#C8F135';
+    ctx.font = 'bold 26px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Comparativa: ${formatearMes(mesA)}  vs  ${formatearMes(mesB)}`, totalW / 2, HEADER_H / 2 + 8);
+
+    // Precargar todas las imágenes (4 poses x 2 meses)
+    const imgsA = {}, imgsB = {};
+    await Promise.all(POSES.flatMap(pose => [
+      cargarImagen(regA?.[pose]).then(im => { imgsA[pose] = im; }),
+      cargarImagen(regB?.[pose]).then(im => { imgsB[pose] = im; }),
+    ]));
+
+    // Dibuja una foto con recorte "contain" centrada en su celda + etiqueta de mes
+    function dibujarFoto(img, x, y, mesLabel) {
+      // Marco
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(x, y, CELL_W, CELL_H);
+
+      if (img) {
+        // contain: escalar manteniendo proporción dentro de CELL_W x CELL_H
+        const scale = Math.min(CELL_W / img.width, CELL_H / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const dx = x + (CELL_W - w) / 2;
+        const dy = y + (CELL_H - h) / 2;
+        ctx.drawImage(img, dx, dy, w, h);
+      } else {
+        ctx.fillStyle = '#6B6B6B';
+        ctx.font = '16px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Sin foto', x + CELL_W / 2, y + CELL_H / 2);
+      }
+
+      // Banda de etiqueta de mes (arriba de la foto)
+      ctx.fillStyle = 'rgba(13,13,13,0.85)';
+      ctx.fillRect(x, y, CELL_W, LABEL_H);
+      ctx.fillStyle = '#F0F0F0';
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(mesLabel, x + CELL_W / 2, y + LABEL_H / 2);
+    }
+
+    // Recorrer las 4 poses en grilla 2x2 de pares
+    POSES.forEach((pose, i) => {
+      const col = i % COLS;           // 0 o 1 (par izquierdo/derecho)
+      const row = Math.floor(i / COLS); // 0 o 1 (fila superior/inferior)
+
+      const pairX = PAD + col * (PAIR_W + GAP);
+      const pairY = HEADER_H + PAD + row * (ROW_H + GAP);
+
+      // Título de la pose
+      ctx.fillStyle = '#C8F135';
+      ctx.font = 'bold 18px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(POSES_LABELS[pose], pairX, pairY + POSE_LABEL_H / 2);
+
+      const fotoY = pairY + POSE_LABEL_H;
+      // Foto A (izquierda) y Foto B (derecha)
+      dibujarFoto(imgsA[pose], pairX, fotoY + LABEL_H, formatearMes(mesA));
+      dibujarFoto(imgsB[pose], pairX + CELL_W + GAP, fotoY + LABEL_H, formatearMes(mesB));
+    });
+
+    // Exportar a JPG y descargar
+    const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+    const a = document.createElement('a');
+    const nombreArchivo = `comparativa-${mesA}-vs-${mesB}.jpg`;
+    a.href = dataURL;
+    a.download = nombreArchivo;
+    a.click();
+
+    mostrarToast('✓ Comparativa descargada', '#C8F135');
+  } catch (err) {
+    console.error('[Descargar comparativa] Error:', err);
+    mostrarToast('✗ Error al generar la imagen', '#FF4D4D');
+  } finally {
+    btnDescargarComparativa.textContent = '⬇ Descargar comparativa (4 poses)';
+    btnDescargarComparativa.style.opacity = '1';
+  }
+});
+
 // ─────────────────────────────────────────────────────────
 //  DASHBOARD
 // ─────────────────────────────────────────────────────────
