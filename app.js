@@ -623,9 +623,65 @@ async function abrirFormMacroNueva() {
     btnCopiarUltimoMacro.classList.add('hidden');
   }
 
+  // Si la fecha por defecto (ayer) ya tiene registro, precargar sus valores
+  // para no sobreescribir con vacíos sin querer.
+  await precargarSiExiste(inputMacrosFecha.value);
+
   macrosFormContainer.classList.remove('hidden');
   macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setTimeout(() => inputMacrosCarbos.focus(), 300);
+
+  // Enfocar el primer campo (Carbohidratos). Reintentos para que el scroll suave
+  // no le robe el foco en Android: si el foco cayó en otro input, lo reasignamos.
+  enfocarPrimerCampoMacros();
+}
+
+/**
+ * Si la fecha ya tiene un registro de macros, precarga sus valores en el
+ * formulario y muestra un aviso. Si no existe, deja los campos como están.
+ * Solo aplica en modo "nueva" (no en edición explícita).
+ */
+async function precargarSiExiste(fecha) {
+  if (macrosEditandoFecha !== null) return; // en edición ya se cargan aparte
+  const reg = await obtenerMacrosPorFecha(fecha);
+  if (reg) {
+    inputMacrosProteina.value = reg.proteina ?? '';
+    inputMacrosCarbos.value   = reg.carbos   ?? '';
+    inputMacrosGrasas.value   = reg.grasas   ?? '';
+    macrosFormTitulo.textContent = 'Ya registrado — editando';
+  } else {
+    macrosFormTitulo.textContent = 'Registrar macros';
+  }
+}
+
+// Al cambiar la fecha en el formulario, precargar valores si ese día ya tiene registro
+inputMacrosFecha.addEventListener('change', async () => {
+  if (macrosEditandoFecha !== null) return; // no interferir en modo edición
+  const fecha = inputMacrosFecha.value;
+  if (!fecha) return;
+  const reg = await obtenerMacrosPorFecha(fecha);
+  if (reg) {
+    inputMacrosProteina.value = reg.proteina ?? '';
+    inputMacrosCarbos.value   = reg.carbos   ?? '';
+    inputMacrosGrasas.value   = reg.grasas   ?? '';
+    macrosFormTitulo.textContent = 'Ya registrado — editando';
+    mostrarToast('Este día ya tiene datos: los cargué para editar', '#C8F135');
+  } else {
+    // Fecha sin registro: limpiar para carga nueva
+    inputMacrosProteina.value = '';
+    inputMacrosCarbos.value   = '';
+    inputMacrosGrasas.value   = '';
+    macrosFormTitulo.textContent = 'Registrar macros';
+  }
+});
+
+/**
+ * Enfoca el primer campo del formulario de macros (Carbohidratos),
+ * reintentando para vencer el timing del scroll suave en móvil.
+ */
+function enfocarPrimerCampoMacros() {
+  const intentar = () => inputMacrosCarbos.focus();
+  setTimeout(intentar, 350);
+  setTimeout(intentar, 550);
 }
 
 // Copiar los valores del último registro al formulario (no toca la fecha)
