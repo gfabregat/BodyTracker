@@ -625,7 +625,7 @@ async function abrirFormMacroNueva() {
 
   macrosFormContainer.classList.remove('hidden');
   macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setTimeout(() => inputMacrosProteina.focus(), 300);
+  setTimeout(() => inputMacrosCarbos.focus(), 300);
 }
 
 // Copiar los valores del último registro al formulario (no toca la fecha)
