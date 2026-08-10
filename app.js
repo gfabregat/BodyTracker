@@ -722,7 +722,7 @@ function parsearMacro(input) {
 btnNuevaMacro.addEventListener('click', abrirFormMacroNueva);
 btnMacrosCancelar.addEventListener('click', cerrarFormMacros);
 
-btnMacrosGuardar.addEventListener('click', async () => {
+async function guardarMacrosDesdeForm() {
   const fecha    = inputMacrosFecha.value;
   const proteina = parsearMacro(inputMacrosProteina);
   const carbos   = parsearMacro(inputMacrosCarbos);
@@ -746,6 +746,17 @@ btnMacrosGuardar.addEventListener('click', async () => {
   macrosMesSelector.value = macrosMesActivo;
   await renderMacrosUI();
   mostrarToast('✓ Macros guardadas', '#C8F135');
+}
+
+btnMacrosGuardar.addEventListener('click', guardarMacrosDesdeForm);
+
+// En el último campo (Proteína), OK/Enter del teclado guarda directamente
+inputMacrosProteina.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    inputMacrosProteina.blur(); // cierra el teclado
+    guardarMacrosDesdeForm();
+  }
 });
 
 // ─────────────────────────────────────────────────────────
