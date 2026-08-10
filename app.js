@@ -127,14 +127,32 @@ function mostrarEstadoSinRegistro() {
   pesoNoRegistro.style.display = 'flex';
   pesoConRegistro.style.display = 'none';
 
-  // Limpiar input y enfocar
+  // Limpiar input
   weightInput.value = '';
   pesoConfirmIcon.classList.add('hidden');
   pesoConfirmIcon.style.display = 'none';
   btnGuardar.style.display = 'block';
 
-  // Enfocar input con pequeño delay para que el teclado aparezca
-  setTimeout(() => weightInput.focus(), 150);
+  // Intentar enfocar el input para desplegar el teclado automáticamente.
+  // Los navegadores móviles pueden ignorar focus sin gesto del usuario, así que
+  // lo intentamos en varios momentos para maximizar las chances.
+  enfocarInputPeso();
+}
+
+/**
+ * Enfoca el input de peso, reintentando en distintos momentos.
+ * En Android el foco programático es best-effort (el SO puede bloquearlo).
+ */
+function enfocarInputPeso() {
+  const intentar = () => {
+    if (pesoNoRegistro.style.display !== 'none') {
+      weightInput.focus();
+    }
+  };
+  // Inmediato, tras el próximo frame, y con un pequeño delay (cubre distintos timings)
+  intentar();
+  requestAnimationFrame(intentar);
+  setTimeout(intentar, 200);
 }
 
 function mostrarEstadoConRegistro(registro) {
@@ -590,7 +608,7 @@ let ultimoMacroRegistro = null; // cache del último registro para "copiar"
 async function abrirFormMacroNueva() {
   macrosEditandoFecha = null;
   macrosFormTitulo.textContent = 'Registrar macros';
-  inputMacrosFecha.value    = hoy();
+  inputMacrosFecha.value    = ayer(); // por defecto ayer: normalmente se registra con un día de retraso
   inputMacrosFecha.disabled = false;
   inputMacrosProteina.value = '';
   inputMacrosCarbos.value   = '';

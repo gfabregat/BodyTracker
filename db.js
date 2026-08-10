@@ -39,6 +39,15 @@ function hoy() {
 }
 
 /**
+ * Devuelve la fecha local de ayer en formato YYYY-MM-DD.
+ */
+function ayer() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return fechaISOLocal(d);
+}
+
+/**
  * Calcula la media aritmética de los últimos N registros disponibles.
  * "Disponibles" = los que existen en DB, sin importar si son días consecutivos.
  * @param {string} fechaHasta  - incluye este registro (YYYY-MM-DD)
