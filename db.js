@@ -48,6 +48,17 @@ function ayer() {
 }
 
 /**
+ * Devuelve el día siguiente a una fecha dada, en formato YYYY-MM-DD.
+ * Construye el Date con componentes locales (no parsea el string directo)
+ * para evitar el corrimiento por UTC.
+ * @param {string} fechaISO - YYYY-MM-DD
+ */
+function diaSiguiente(fechaISO) {
+  const [y, m, d] = fechaISO.split('-').map(Number);
+  return fechaISOLocal(new Date(y, m - 1, d + 1));
+}
+
+/**
  * Calcula la media aritmética de los últimos N registros disponibles.
  * "Disponibles" = los que existen en DB, sin importar si son días consecutivos.
  * @param {string} fechaHasta  - incluye este registro (YYYY-MM-DD)

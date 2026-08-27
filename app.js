@@ -608,14 +608,13 @@ let ultimoMacroRegistro = null; // cache del último registro para "copiar"
 async function abrirFormMacroNueva() {
   macrosEditandoFecha = null;
   macrosFormTitulo.textContent = 'Registrar macros';
-  inputMacrosFecha.value    = ayer(); // por defecto ayer: normalmente se registra con un día de retraso
   inputMacrosFecha.disabled = false;
   inputMacrosProteina.value = '';
   inputMacrosCarbos.value   = '';
   inputMacrosGrasas.value   = '';
 
   // Botón "copiar último": solo si existe algún registro previo con datos
-  const todas = await obtenerTodasLasMacros();
+  const todas = await obtenerTodasLasMacros(); // ordenadas ASC por fecha
   ultimoMacroRegistro = todas.length ? todas[todas.length - 1] : null;
   if (ultimoMacroRegistro) {
     btnCopiarUltimoMacro.classList.remove('hidden');
@@ -623,7 +622,19 @@ async function abrirFormMacroNueva() {
     btnCopiarUltimoMacro.classList.add('hidden');
   }
 
-  // Si la fecha por defecto (ayer) ya tiene registro, precargar sus valores
+  // Fecha por defecto: el día siguiente al último registro, para ir completando
+  // la serie sin huecos. Si no hay registros, se usa ayer (se registra con un
+  // día de retraso). Nunca se propone una fecha futura.
+  let fechaPorDefecto;
+  if (ultimoMacroRegistro) {
+    fechaPorDefecto = diaSiguiente(ultimoMacroRegistro.fecha);
+    if (fechaPorDefecto > hoy()) fechaPorDefecto = hoy();
+  } else {
+    fechaPorDefecto = ayer();
+  }
+  inputMacrosFecha.value = fechaPorDefecto;
+
+  // Si esa fecha ya tiene registro, precargar sus valores
   // para no sobreescribir con vacíos sin querer.
   await precargarSiExiste(inputMacrosFecha.value);
 
