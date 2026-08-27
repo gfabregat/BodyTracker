@@ -609,12 +609,16 @@ async function mediaMovilHastaMes(mesISO) {
 }
 
 /**
- * Obtiene los datos de peso de los últimos 3 meses para el mini gráfico.
+ * Obtiene los datos de peso para el mini gráfico del dashboard:
+ * el mes seleccionado más el mes anterior (~60 días).
+ * Se eligió esta ventana para que la curva respalde visualmente el delta
+ * "vs mes anterior" que el dashboard muestra justo arriba del gráfico.
+ * Para cambiarla a un solo mes, usar `new Date(y, m - 1, 1)` en `desde`.
  */
-async function obtenerPesos3Meses(mesISO) {
+async function obtenerPesosMiniGrafico(mesISO) {
   const [y, m] = mesISO.split('-').map(Number);
-  const desde = new Date(y, m - 3, 1);
-  const hasta = new Date(y, m, 0);
+  const desde = new Date(y, m - 2, 1); // 1° del mes anterior
+  const hasta = new Date(y, m, 0);     // último día del mes seleccionado
   const fechaDesde = fechaISOLocal(desde);
   const fechaHasta = fechaISOLocal(hasta);
 

@@ -2618,8 +2618,19 @@ async function renderDashboard(mes) {
   }
 }
 
+// Meses abreviados para las etiquetas del eje X del mini gráfico
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/**
+ * Formatea 'YYYY-MM-DD' como '5 ago' para las etiquetas del mini gráfico.
+ */
+function etiquetaFechaCorta(fechaISO) {
+  const [, mm, dd] = fechaISO.split('-');
+  return `${Number(dd)} ${MESES_CORTOS[Number(mm) - 1]}`;
+}
+
 async function renderDashMiniChart(mes) {
-  const datos = await obtenerPesos3Meses(mes);
+  const datos = await obtenerPesosMiniGrafico(mes);
 
   if (datos.length < 2) {
     dashPesoChartEmpty.style.display = 'flex';
@@ -2660,12 +2671,54 @@ async function renderDashMiniChart(mes) {
       animation: { duration: 300 },
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: false },
+        tooltip: {
+          enabled: true,
+          displayColors: false,
+          backgroundColor: '#1A1A1A',
+          borderColor: '#2A2A2A',
+          borderWidth: 1,
+          titleColor: '#6B6B6B',
+          bodyColor: '#F0F0F0',
+          titleFont: { size: 11 },
+          bodyFont: { size: 13, weight: '600' },
+          callbacks: {
+            title: (items) => etiquetaFechaCorta(items[0].label),
+            label: (item) => (item.parsed.y == null ? 'Sin dato' : `${item.parsed.y.toFixed(1)} kg`),
+          },
+        },
         zoom: { pan: { enabled: false }, zoom: { pinch: { enabled: false }, wheel: { enabled: false } } },
       },
+      interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { display: false },
-        y: { display: false, grace: '10%' },
+        x: {
+          display: true,
+          grid: { display: false },
+          border: { display: false },
+          ticks: {
+            color: '#6B6B6B',
+            font: { size: 10 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 5,
+            callback: function (value) {
+              return etiquetaFechaCorta(this.getLabelForValue(value));
+            },
+          },
+        },
+        y: {
+          display: true,
+          position: 'right',
+          grace: '15%',
+          grid: { color: '#1F1F1F', drawTicks: false },
+          border: { display: false },
+          ticks: {
+            color: '#6B6B6B',
+            font: { size: 10 },
+            maxTicksLimit: 4,
+            padding: 4,
+            callback: (v) => `${v} kg`,
+          },
+        },
       },
     },
   });
