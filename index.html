@@ -312,6 +312,20 @@
                      caret-color:#C8F135; color:#F0F0F0; color-scheme:dark;" />
           </div>
 
+          <!-- Calidad del dato: pesado en balanza vs estimado a ojo.
+               Va antes de los macros para no interrumpir el flujo
+               carbos → grasas → proteína → Enter guarda. -->
+          <label for="macros-estimada"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl mb-4 cursor-pointer"
+            style="background:#0D0D0D; border:1px solid #2A2A2A; min-height:48px;">
+            <input id="macros-estimada" type="checkbox"
+              style="width:20px; height:20px; accent-color:#C8F135; flex-shrink:0;" />
+            <span class="text-text text-sm font-500" style="line-height:1.3;">
+              Ingesta estimada
+              <span class="text-muted text-xs block">Marcalo si no pesaste la comida en balanza</span>
+            </span>
+          </label>
+
           <div class="mb-4">
             <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Carbohidratos (g)</label>
             <input id="macros-carbos" type="number" inputmode="decimal" step="1" min="0" max="1000"

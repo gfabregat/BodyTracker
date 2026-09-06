@@ -657,6 +657,9 @@ async function guardarMacros(fecha, datos) {
     proteina: datos.proteina ?? null,
     carbos:   datos.carbos   ?? null,
     grasas:   datos.grasas   ?? null,
+    // true = ingesta estimada "a ojo"; false = comida pesada en balanza.
+    // Campo NO indexado: no requiere bump de versión de Dexie.
+    estimada: datos.estimada === true,
   });
 }
 
@@ -707,7 +710,12 @@ async function calcularPromedioMacrosMes(mes) {
   const [y, m] = mes.split('-').map(Number);
   const diasTotales = new Date(y, m, 0).getDate();
 
-  if (!registros.length) return { proteina: null, carbos: null, grasas: null, diasConDato: 0, diasTotales };
+  if (!registros.length) {
+    return {
+      proteina: null, carbos: null, grasas: null,
+      diasConDato: 0, diasTotales, diasEstimados: 0, diasPesados: 0,
+    };
+  }
 
   const sumaP = registros.reduce((a, r) => a + (r.proteina ?? 0), 0);
   const sumaC = registros.reduce((a, r) => a + (r.carbos   ?? 0), 0);
@@ -717,11 +725,17 @@ async function calcularPromedioMacrosMes(mes) {
   const diasC = registros.filter(r => r.carbos   !== null).length;
   const diasG = registros.filter(r => r.grasas   !== null).length;
 
+  // Registros anteriores a esta funcionalidad no tienen `estimada`:
+  // se cuentan como pesados (false), que era el supuesto implícito.
+  const diasEstimados = registros.filter(r => r.estimada === true).length;
+
   return {
     proteina:   diasP > 0 ? Math.round(sumaP / diasP) : null,
     carbos:     diasC > 0 ? Math.round(sumaC / diasC) : null,
     grasas:     diasG > 0 ? Math.round(sumaG / diasG) : null,
     diasConDato: registros.length,
     diasTotales,
+    diasEstimados,
+    diasPesados: registros.length - diasEstimados,
   };
 }

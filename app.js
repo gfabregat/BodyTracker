@@ -477,6 +477,7 @@ const inputMacrosFecha     = document.getElementById('macros-fecha');
 const inputMacrosProteina  = document.getElementById('macros-proteina');
 const inputMacrosCarbos    = document.getElementById('macros-carbos');
 const inputMacrosGrasas    = document.getElementById('macros-grasas');
+const inputMacrosEstimada  = document.getElementById('macros-estimada');
 
 let macrosEditandoFecha = null; // null = nueva, 'YYYY-MM-DD' = editando
 let macrosMesActivo = mesActual(); // mes que se está visualizando
@@ -530,6 +531,14 @@ function renderMacrosPromedio(p) {
 
   const dias = `<span class="text-muted text-xs">(${p.diasConDato} de ${p.diasTotales} días registrados)</span>`;
 
+  // Desglose de calidad del dato: solo si hay al menos un día estimado
+  const calidad = p.diasEstimados > 0
+    ? `<p class="text-muted text-xs mt-3" style="line-height:1.4;">
+         <span style="color:#C8F135;">${p.diasPesados}</span> pesados en balanza ·
+         <span style="color:#F0F0F0;">${p.diasEstimados}</span> estimados
+       </p>`
+    : '';
+
   macrosPromedio.innerHTML = `
     <div class="flex items-center justify-between mb-3">
       <p class="text-text text-xs font-600 uppercase tracking-wider">Promedio diario</p>
@@ -548,7 +557,8 @@ function renderMacrosPromedio(p) {
         <p class="text-muted text-xs mb-1">Grasas</p>
         <p class="text-text font-700 text-lg">${p.grasas ?? '—'}<span class="text-muted font-400 text-xs"> g</span></p>
       </div>
-    </div>`;
+    </div>
+    ${calidad}`;
 }
 
 // ── Historial del mes ───────────────────────────────────
@@ -568,7 +578,13 @@ function renderMacrosHistorial(registros) {
       <div class="flex items-center justify-between px-4 py-3 rounded-2xl"
         style="background:#1A1A1A; border:1px solid #2A2A2A;">
         <div>
-          <p class="text-text text-sm font-600 mb-1">${fechaLabel}</p>
+          <p class="text-text text-sm font-600 mb-1">
+            ${fechaLabel}
+            ${reg.estimada === true
+              ? `<span class="text-xs font-500 px-2 py-0.5 rounded-md ml-1"
+                   style="background:#2A2A2A; color:#6B6B6B;">~ estimada</span>`
+              : ''}
+          </p>
           <p class="text-muted text-xs">
             ${reg.proteina !== null ? `P: <span style="color:#F0F0F0;">${reg.proteina}g</span>` : ''}
             ${reg.carbos   !== null ? `  C: <span style="color:#F0F0F0;">${reg.carbos}g</span>` : ''}
@@ -612,6 +628,7 @@ async function abrirFormMacroNueva() {
   inputMacrosProteina.value = '';
   inputMacrosCarbos.value   = '';
   inputMacrosGrasas.value   = '';
+  inputMacrosEstimada.checked = false;
 
   // Botón "copiar último": solo si existe algún registro previo con datos
   const todas = await obtenerTodasLasMacros(); // ordenadas ASC por fecha
@@ -658,6 +675,7 @@ async function precargarSiExiste(fecha) {
     inputMacrosProteina.value = reg.proteina ?? '';
     inputMacrosCarbos.value   = reg.carbos   ?? '';
     inputMacrosGrasas.value   = reg.grasas   ?? '';
+    inputMacrosEstimada.checked = reg.estimada === true;
     macrosFormTitulo.textContent = 'Ya registrado — editando';
   } else {
     macrosFormTitulo.textContent = 'Registrar macros';
@@ -674,6 +692,7 @@ inputMacrosFecha.addEventListener('change', async () => {
     inputMacrosProteina.value = reg.proteina ?? '';
     inputMacrosCarbos.value   = reg.carbos   ?? '';
     inputMacrosGrasas.value   = reg.grasas   ?? '';
+    inputMacrosEstimada.checked = reg.estimada === true;
     macrosFormTitulo.textContent = 'Ya registrado — editando';
     mostrarToast('Este día ya tiene datos: los cargué para editar', '#C8F135');
   } else {
@@ -681,6 +700,7 @@ inputMacrosFecha.addEventListener('change', async () => {
     inputMacrosProteina.value = '';
     inputMacrosCarbos.value   = '';
     inputMacrosGrasas.value   = '';
+    inputMacrosEstimada.checked = false;
     macrosFormTitulo.textContent = 'Registrar macros';
   }
 });
@@ -701,6 +721,7 @@ btnCopiarUltimoMacro.addEventListener('click', () => {
   inputMacrosProteina.value = ultimoMacroRegistro.proteina ?? '';
   inputMacrosCarbos.value   = ultimoMacroRegistro.carbos   ?? '';
   inputMacrosGrasas.value   = ultimoMacroRegistro.grasas   ?? '';
+  inputMacrosEstimada.checked = ultimoMacroRegistro.estimada === true;
   mostrarToast(`⧉ Copiado de ${formatearFecha(ultimoMacroRegistro.fecha)}`, '#C8F135');
 });
 
@@ -715,6 +736,7 @@ async function abrirFormMacroEdicion(fecha) {
   inputMacrosProteina.value = reg.proteina ?? '';
   inputMacrosCarbos.value   = reg.carbos   ?? '';
   inputMacrosGrasas.value   = reg.grasas   ?? '';
+  inputMacrosEstimada.checked = reg.estimada === true;
   macrosFormContainer.classList.remove('hidden');
   macrosFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -738,6 +760,7 @@ async function guardarMacrosDesdeForm() {
   const proteina = parsearMacro(inputMacrosProteina);
   const carbos   = parsearMacro(inputMacrosCarbos);
   const grasas   = parsearMacro(inputMacrosGrasas);
+  const estimada = inputMacrosEstimada.checked;
 
   if (!fecha) {
     mostrarToast('Seleccioná una fecha', '#FF4D4D');
@@ -748,7 +771,7 @@ async function guardarMacrosDesdeForm() {
     return;
   }
 
-  await guardarMacros(fecha, { proteina, carbos, grasas });
+  await guardarMacros(fecha, { proteina, carbos, grasas, estimada });
   cerrarFormMacros();
 
   // Saltar la vista al mes del registro guardado (por si era de otro mes)
@@ -2460,7 +2483,7 @@ async function renderDashboard(mes) {
     dashMacros.innerHTML = `
       <div class="flex items-center justify-between mb-3">
         <span class="text-muted text-xs">Promedio diario</span>
-        <span class="text-muted text-xs">${p.diasConDato} de ${p.diasTotales} días registrados</span>
+        <span class="text-muted text-xs">${p.diasConDato} de ${p.diasTotales} días registrados${p.diasEstimados > 0 ? ` · ${p.diasEstimados} estimados` : ''}</span>
       </div>
       <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
         <div class="rounded-xl p-3" style="background:#0D0D0D;">
@@ -2849,6 +2872,7 @@ async function generarInformeMarkdown(mes) {
   if (promedioMacros.diasConDato > 0) {
     lineas.push('## MACROS (promedio días registrados)');
     lineas.push(`- **Días con registro:** ${promedioMacros.diasConDato} de ${promedioMacros.diasTotales}`);
+    lineas.push(`- **Calidad del dato:** ${promedioMacros.diasPesados} días pesados en balanza, ${promedioMacros.diasEstimados} estimados a ojo`);
     if (promedioMacros.proteina !== null) lineas.push(`- **Proteína:**      ${promedioMacros.proteina} g/día`);
     if (promedioMacros.carbos   !== null) lineas.push(`- **Carbohidratos:** ${promedioMacros.carbos} g/día`);
     if (promedioMacros.grasas   !== null) lineas.push(`- **Grasas:**        ${promedioMacros.grasas} g/día`);
