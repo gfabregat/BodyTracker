@@ -635,6 +635,51 @@
             <p class="text-muted text-xs mt-2">Promedio de pasos por día durante el mes</p>
           </div>
 
+          <!-- Sueño y recuperación (datos de Garmin) -->
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Sueño y recuperación</p>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">FC en reposo (ppm)</label>
+            <input id="ci-fc-reposo" type="number" inputmode="decimal" step="1" min="20" max="150"
+              placeholder="ej: 52"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">HRV (ms)</label>
+            <input id="ci-hrv" type="number" inputmode="decimal" step="1" min="0" max="300"
+              placeholder="ej: 68"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+          </div>
+
+          <div class="mb-4">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Estado de HRV</label>
+            <select id="ci-hrv-estado"
+              class="w-full text-base font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; color:#F0F0F0; outline:none;
+                     height:48px; padding:0 32px 0 14px; border-radius:12px;
+                     -webkit-appearance:none; appearance:none;
+                     background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B6B%22 stroke-width=%223%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                     background-repeat:no-repeat; background-position:right 12px center;">
+              <option value="">— Sin dato —</option>
+              <option value="Equilibrado">Equilibrado</option>
+              <option value="Bajo">Bajo</option>
+              <option value="Poco equilibrado">Poco equilibrado</option>
+              <option value="Alto">Alto</option>
+            </select>
+          </div>
+
+          <div class="mb-5">
+            <label class="text-muted text-xs font-500 uppercase tracking-wider mb-1 block">Puntuación de sueño</label>
+            <input id="ci-sueno" type="number" inputmode="decimal" step="1" min="0" max="100"
+              placeholder="ej: 78"
+              class="w-full px-4 py-3 rounded-xl text-text text-lg font-600"
+              style="background:#0D0D0D; border:1px solid #2A2A2A; outline:none; caret-color:#C8F135; -moz-appearance:textfield;" />
+            <p class="text-muted text-xs mt-2">Escala 0-100 de Garmin</p>
+          </div>
+
           <!-- Notas -->
           <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Notas de contexto <span style="font-weight:400;">(opcional)</span></p>
           <textarea id="ci-notas" rows="3"
@@ -938,6 +983,14 @@
         <div class="mb-4">
           <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Fatiga y actividad</p>
           <div id="dash-fatiga" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
+            <p class="text-muted text-sm">—</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE: Sueño y recuperación -->
+        <div class="mb-4">
+          <p class="text-muted text-xs font-500 uppercase tracking-wider mb-3">Sueño y recuperación</p>
+          <div id="dash-sueno" class="rounded-2xl p-4" style="background:#1A1A1A; border:1px solid #2A2A2A;">
             <p class="text-muted text-sm">—</p>
           </div>
         </div>

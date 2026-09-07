@@ -283,13 +283,32 @@ function renderDeltaFlecha(delta, unidad = 'cm') {
   const signo = delta.valor > 0 ? '+' : '';
   const valorStr = `${signo}${delta.valor.toFixed(1)} ${unidad}`;
 
-  if (delta.direccion === 'neutral') {
-    return `<span style="color:#6B6B6B">→ ${valorStr}</span>`;
-  }
-  if (delta.direccion === 'mejor') {
-    return `<span style="color:#C8F135">↑ ${valorStr}</span>`;
-  }
-  return `<span style="color:#FF4D4D">↓ ${valorStr}</span>`;
+  // La FLECHA indica hacia dónde se movió el número; el COLOR indica si ese
+  // movimiento es bueno o malo según el campo. Antes la flecha se derivaba de
+  // `direccion`, lo que producía contradicciones como "↑ -1.0 cm" al bajar la
+  // cintura (una mejora, pero con el número en negativo).
+  const color = delta.direccion === 'mejor' ? '#C8F135'
+              : delta.direccion === 'peor'  ? '#FF4D4D'
+              : '#6B6B6B';
+  const flecha = delta.direccion === 'neutral' ? '→'
+               : delta.valor > 0 ? '↑' : '↓';
+
+  return `<span style="color:${color}">${flecha} ${valorStr}</span>`;
+}
+
+/**
+ * Delta genérico para métricas simples con un umbral de significancia.
+ * @param {number|null} anterior
+ * @param {number|null} actual
+ * @param {number} umbral      - por debajo de este cambio se considera neutral
+ * @param {boolean} mejorSiSube - true si subir es la mejora esperada
+ */
+function calcularDeltaSimple(anterior, actual, umbral, mejorSiSube) {
+  if (anterior == null || actual == null) return { valor: null, direccion: 'neutral' };
+  const diff = actual - anterior;
+  if (Math.abs(diff) < umbral) return { valor: diff, direccion: 'neutral' };
+  const esMejora = mejorSiSube ? diff > 0 : diff < 0;
+  return { valor: diff, direccion: esMejora ? 'mejor' : 'peor' };
 }
 
 /**
@@ -320,6 +339,12 @@ async function guardarCheckin(mes, datos) {
     rdl:       datos.rdl       ?? null,
     fatiga:    datos.fatiga    ?? null,
     pasos:     datos.pasos     ?? null,
+    // Sueño y recuperación (Garmin). Campos NO indexados: sin bump de versión.
+    // Los períodos de cada media se documentan solo en el informe al entrenador.
+    fcReposo:   datos.fcReposo   ?? null, // ppm, media 4 semanas
+    hrv:        datos.hrv        ?? null, // ms, media 7 días
+    hrvEstado:  datos.hrvEstado  ?? null, // Equilibrado | Bajo | Poco equilibrado | Alto
+    sueno:      datos.sueno      ?? null, // 0-100, media 4 semanas
     notas:     datos.notas     ?? null,
   });
 }

@@ -1215,6 +1215,10 @@ const inputCiFatiga       = document.getElementById('ci-fatiga');
 const inputCiFatigaActiva = document.getElementById('ci-fatiga-activa');
 const ciFatigaValor       = document.getElementById('ci-fatiga-valor');
 const inputCiPasos        = document.getElementById('ci-pasos');
+const inputCiFcReposo     = document.getElementById('ci-fc-reposo');
+const inputCiHrv          = document.getElementById('ci-hrv');
+const selectCiHrvEstado   = document.getElementById('ci-hrv-estado');
+const inputCiSueno        = document.getElementById('ci-sueno');
 const inputCiNotas        = document.getElementById('ci-notas');
 const dashboardBadge      = document.getElementById('dashboard-badge');
 
@@ -1404,6 +1408,32 @@ function renderResumenCheckin(reg, todos) {
       <p class="text-muted text-xs mb-1">Media de pasos diarios</p>
       <p class="text-text font-700">${reg.pasos.toLocaleString('es-ES')} <span class="text-muted font-400 text-xs">pasos/día</span></p>
     </div>` : ''}
+    ${(reg.fcReposo != null || reg.hrv != null || reg.hrvEstado || reg.sueno != null) ? `
+    <div class="rounded-xl p-3 mt-2" style="background:#0D0D0D;">
+      <p class="text-muted text-xs mb-2">Sueño y recuperación</p>
+      <div class="grid gap-2" style="grid-template-columns:1fr 1fr;">
+        ${reg.fcReposo != null ? `
+        <div>
+          <p class="text-muted text-xs">FC reposo</p>
+          <p class="text-text font-700">${reg.fcReposo} <span class="text-muted font-400 text-xs">ppm</span></p>
+        </div>` : ''}
+        ${reg.hrv != null ? `
+        <div>
+          <p class="text-muted text-xs">HRV</p>
+          <p class="text-text font-700">${reg.hrv} <span class="text-muted font-400 text-xs">ms</span></p>
+        </div>` : ''}
+        ${reg.sueno != null ? `
+        <div>
+          <p class="text-muted text-xs">Sueño</p>
+          <p class="text-text font-700">${reg.sueno}<span class="text-muted font-400 text-xs">/100</span></p>
+        </div>` : ''}
+        ${reg.hrvEstado ? `
+        <div>
+          <p class="text-muted text-xs">Estado HRV</p>
+          <p class="text-text font-700 text-sm">${reg.hrvEstado}</p>
+        </div>` : ''}
+      </div>
+    </div>` : ''}
   `;
 }
 
@@ -1488,6 +1518,17 @@ function renderHistorialCheckin(historial, todos) {
             <span class="text-text font-700 text-sm">${reg.pasos.toLocaleString('es-ES')}</span>
           </div>
         </div>` : ''}
+        ${(reg.fcReposo != null || reg.hrv != null || reg.hrvEstado || reg.sueno != null) ? `
+        <div class="px-4 pb-3">
+          <div class="rounded-xl px-3 py-2" style="background:#0D0D0D;">
+            <span class="text-muted text-xs">
+              ${reg.fcReposo != null ? `FC <span style="color:#F0F0F0;font-weight:700;">${reg.fcReposo}</span>ppm ` : ''}
+              ${reg.hrv      != null ? `· HRV <span style="color:#F0F0F0;font-weight:700;">${reg.hrv}</span>ms ` : ''}
+              ${reg.sueno    != null ? `· Sueño <span style="color:#F0F0F0;font-weight:700;">${reg.sueno}</span> ` : ''}
+              ${reg.hrvEstado ? `· <span style="color:#F0F0F0;">${reg.hrvEstado}</span>` : ''}
+            </span>
+          </div>
+        </div>` : ''}
       </div>`;
   }).join('');
 
@@ -1521,6 +1562,10 @@ function abrirFormCheckinNuevo() {
   inputCiFatigaActiva.checked = true;
   inputCiFatiga.disabled = false;
   inputCiPasos.value     = '';
+  inputCiFcReposo.value  = '';
+  inputCiHrv.value       = '';
+  selectCiHrvEstado.value = '';
+  inputCiSueno.value     = '';
   inputCiNotas.value     = '';
   ciFormContainer.classList.remove('hidden');
   ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1550,6 +1595,10 @@ async function abrirFormCheckinEdicion(mes) {
 
   inputCiNotas.value = reg.notas || '';
   inputCiPasos.value = reg.pasos !== null && reg.pasos !== undefined ? reg.pasos : '';
+  inputCiFcReposo.value   = reg.fcReposo  != null ? reg.fcReposo : '';
+  inputCiHrv.value        = reg.hrv       != null ? reg.hrv      : '';
+  selectCiHrvEstado.value = reg.hrvEstado || '';
+  inputCiSueno.value      = reg.sueno     != null ? reg.sueno    : '';
   ciFormContainer.classList.remove('hidden');
   ciFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1589,16 +1638,26 @@ btnCiGuardar.addEventListener('click', async () => {
   const fatiga    = inputCiFatigaActiva.checked ? parseInt(inputCiFatiga.value, 10) : null;
   const pasosVal  = inputCiPasos.value.trim();
   const pasos     = pasosVal !== '' ? Math.round(parseFloat(pasosVal)) : null;
+  const fcReposo  = parsearPR(inputCiFcReposo);
+  const hrv       = parsearPR(inputCiHrv);
+  const hrvEstado = selectCiHrvEstado.value || null;
+  const sueno     = parsearPR(inputCiSueno);
   const notas     = inputCiNotas.value.trim() || null;
 
   // Al menos un campo debe tener dato
-  if (banca === null && dominadas === null && rdl === null && fatiga === null && pasos === null && !notas) {
+  const haySueno = fcReposo !== null || hrv !== null || hrvEstado !== null || sueno !== null;
+  if (banca === null && dominadas === null && rdl === null && fatiga === null
+      && pasos === null && !haySueno && !notas) {
     mostrarToast('Completá al menos un campo antes de guardar', '#FF4D4D');
     return;
   }
 
   const mes = ciEditandoMes || ciMesActivo;
-  await guardarCheckin(mes, { banca, dominadas, rdl, fatiga, pasos, notas });
+  await guardarCheckin(mes, {
+    banca, dominadas, rdl, fatiga, pasos,
+    fcReposo, hrv, hrvEstado, sueno,
+    notas,
+  });
 
   cerrarFormCheckin();
   ciMesActivo = mes;
@@ -2392,6 +2451,7 @@ const dashMediciones       = document.getElementById('dash-mediciones');
 const dashMacros           = document.getElementById('dash-macros');
 const dashPRs              = document.getElementById('dash-prs');
 const dashFatiga           = document.getElementById('dash-fatiga');
+const dashSueno            = document.getElementById('dash-sueno');
 const dashNotasContainer   = document.getElementById('dash-notas-container');
 const dashNotasTexto       = document.getElementById('dash-notas-texto');
 const dashFotos            = document.getElementById('dash-fotos');
@@ -2584,6 +2644,44 @@ async function renderDashboard(mes) {
       <span class="text-muted text-xs ml-2">(anterior: ${ciAnterior.pasos.toLocaleString('es-ES')})</span>` : ''}`;
   } else {
     dashFatiga.innerHTML = `<p class="text-muted text-sm">Sin fatiga registrada para este mes.</p>`;
+  }
+
+  // ── Sueño y recuperación ─────────────────────────────
+  // Umbrales de significancia: 2 ppm en FC reposo, 3 ms en HRV, 3 puntos en sueño.
+  // FC reposo mejora bajando; HRV y puntuación de sueño mejoran subiendo.
+  if (ciActual?.fcReposo != null || ciActual?.hrv != null
+      || ciActual?.hrvEstado || ciActual?.sueno != null) {
+
+    const dFc    = calcularDeltaSimple(ciAnterior?.fcReposo ?? null, ciActual.fcReposo ?? null, 2, false);
+    const dHrv   = calcularDeltaSimple(ciAnterior?.hrv      ?? null, ciActual.hrv      ?? null, 3, true);
+    const dSueno = calcularDeltaSimple(ciAnterior?.sueno    ?? null, ciActual.sueno    ?? null, 3, true);
+
+    const tarjeta = (nombre, valor, unidad, delta, unidadDelta = unidad) => `
+      <div class="rounded-xl p-3" style="background:#0D0D0D;">
+        <p class="text-muted text-xs mb-1">${nombre}</p>
+        <p class="font-700" style="font-size:15px;">
+          ${valor != null
+            ? `${valor}<span style="color:#6B6B6B;font-size:11px;font-weight:400;"> ${unidad}</span>`
+            : '<span style="color:#6B6B6B">—</span>'}
+        </p>
+        <p class="text-xs mt-1">${renderDeltaFlecha(delta, unidadDelta)}</p>
+      </div>`;
+
+    dashSueno.innerHTML = `
+      <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr;">
+        ${tarjeta('FC reposo', ciActual.fcReposo ?? null, 'ppm', dFc)}
+        ${tarjeta('HRV', ciActual.hrv ?? null, 'ms', dHrv)}
+        ${tarjeta('Sueño', ciActual.sueno ?? null, '/100', dSueno, '')}
+      </div>
+      ${ciActual.hrvEstado ? `
+      <div class="mt-3 pt-3" style="border-top:1px solid #2A2A2A;">
+        <span class="text-muted text-xs">Estado de HRV: </span>
+        <span class="text-text font-700">${ciActual.hrvEstado}</span>
+        ${ciAnterior?.hrvEstado ? `
+        <span class="text-muted text-xs ml-2">(anterior: ${ciAnterior.hrvEstado})</span>` : ''}
+      </div>` : ''}`;
+  } else {
+    dashSueno.innerHTML = `<p class="text-muted text-sm">Sin datos de sueño para este mes.</p>`;
   }
 
   // ── Notas del check-in ───────────────────────────────
@@ -2864,6 +2962,40 @@ async function generarInformeMarkdown(mes) {
     lineas.push(`- **Este mes:**     ${ciActual.pasos.toLocaleString('es-ES')} pasos/día`);
     if (ciAnterior?.pasos !== null && ciAnterior?.pasos !== undefined) {
       lineas.push(`- **Mes anterior:** ${ciAnterior.pasos.toLocaleString('es-ES')} pasos/día`);
+    }
+    lineas.push('');
+  }
+
+  // ── Sueño y recuperación ──────────────────────────────
+  // Los períodos de cada media se explicitan acá porque el entrenador
+  // necesita saber a qué ventana temporal corresponde cada valor.
+  if (ciActual?.fcReposo != null || ciActual?.hrv != null
+      || ciActual?.hrvEstado || ciActual?.sueno != null) {
+    lineas.push('## SUEÑO Y RECUPERACIÓN');
+
+    if (ciActual.fcReposo != null) {
+      lineas.push(`- **FC en reposo (ppm, media 4 semanas):** ${ciActual.fcReposo}`);
+      if (ciAnterior?.fcReposo != null) {
+        lineas.push(`  - Mes anterior: ${ciAnterior.fcReposo} ppm`);
+      }
+    }
+    if (ciActual.hrv != null) {
+      lineas.push(`- **HRV (ms, media 7 días):** ${ciActual.hrv}`);
+      if (ciAnterior?.hrv != null) {
+        lineas.push(`  - Mes anterior: ${ciAnterior.hrv} ms`);
+      }
+    }
+    if (ciActual.hrvEstado) {
+      lineas.push(`- **Estado de HRV:** ${ciActual.hrvEstado}`);
+      if (ciAnterior?.hrvEstado) {
+        lineas.push(`  - Mes anterior: ${ciAnterior.hrvEstado}`);
+      }
+    }
+    if (ciActual.sueno != null) {
+      lineas.push(`- **Puntuación de sueño (0-100, media 4 semanas):** ${ciActual.sueno}`);
+      if (ciAnterior?.sueno != null) {
+        lineas.push(`  - Mes anterior: ${ciAnterior.sueno}`);
+      }
     }
     lineas.push('');
   }
